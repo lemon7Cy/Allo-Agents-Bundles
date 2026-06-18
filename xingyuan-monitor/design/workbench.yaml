@@ -1,0 +1,165 @@
+schema_version: agent_workbench.v1
+agent: xingyuan-monitor
+display_name: 星元枢算助手
+template: run_console
+primary_object: inspection_run
+
+status:
+  runtime_loaded: false
+  design_loaded: true
+  phase: phase-1-workbench
+  purpose: Design/runtime-candidate declaration for the generic Agent Workbench run console.
+
+commands:
+  - id: inspection.preview
+    label: 执行巡检预览
+    description: 顺序采集 MaaS、DFCode，并生成可审阅的巡检摘要与报告草稿。
+    requires_confirmation: false
+    scopes:
+      - maas
+      - dfcode
+      - platform
+      - feishu
+    produces:
+      - capability_results
+      - evidence
+      - report_artifacts
+      - delivery_draft
+
+  - id: report.generate
+    label: 生成 Markdown 报告
+    description: 基于当前 Run 的能力结果和证据生成 Markdown 诊断报告。
+    requires_confirmation: false
+    scopes:
+      - platform
+    produces:
+      - report_artifacts
+
+  - id: delivery.feishu.draft
+    label: 生成飞书草稿
+    description: 基于当前 Run 生成飞书卡片预览，不直接发送。
+    requires_confirmation: false
+    scopes:
+      - feishu
+    produces:
+      - delivery_draft
+
+  - id: delivery.feishu.send
+    label: 发送到飞书
+    description: 将已确认的飞书卡片发送到配置的飞书目标。
+    requires_confirmation: true
+    scopes:
+      - feishu
+    consumes:
+      - delivery_draft
+
+panels:
+  - id: run_status_header
+    region: top
+
+  - id: command_panel
+    region: top
+
+  - id: run_sidebar
+    region: left
+
+  - id: run_timeline
+    region: center
+
+  - id: capability_results
+    region: center
+    capabilities:
+      - maas-fleet-monitor
+      - dfcode-enterprise-mcp
+
+  - id: report_artifacts
+    region: right
+
+  - id: delivery
+    region: right
+    channel: feishu
+
+  - id: evidence
+    region: right
+
+  - id: capability_readiness
+    region: bottom
+    collapsed_by_default: true
+
+capability_bindings:
+  - capability_id: maas-fleet-monitor
+    command_ids:
+      - inspection.preview
+    result_role: observability
+    required_for_success: false
+
+  - capability_id: dfcode-enterprise-mcp
+    command_ids:
+      - inspection.preview
+    result_role: business-data
+    required_for_success: true
+
+  - capability_id: feishu-webhook-report
+    command_ids:
+      - delivery.feishu.draft
+      - delivery.feishu.send
+    result_role: notification
+    required_for_success: false
+
+output_profiles:
+  default: monitor_card
+  report: diagnostic_report
+  delivery: feishu_interactive_card
+
+delivery:
+  feishu:
+    implementation: skill
+    skill: feishu-webhook-report
+    send_policy: preview_unless_explicit_send
+    draft_command: delivery.feishu.draft
+    send_command: delivery.feishu.send
+    requires_explicit_confirmation: true
+
+permissions:
+  read_only_by_default: true
+  allowed_actions:
+    - inspect_capability_readiness
+    - read_maas_metrics_via_skill
+    - read_dfcode_status_via_mcp
+    - create_feishu_draft
+    - send_feishu_when_explicitly_requested
+  blocked_actions:
+    - expose_tokens_passwords_api_keys_or_cookies
+    - write_database_records
+    - restart_services
+    - change_provider_pool_routing
+    - mutate_accounts_or_permissions
+
+readiness:
+  business_api_calls: false
+  show_required_optional_split: true
+  required_capabilities:
+    - dfcode-enterprise-mcp
+  optional_capabilities:
+    - maas-fleet-monitor
+    - feishu-webhook-report
+
+ui:
+  run_console:
+    primary_question: 我现在在看哪一次巡检？
+    next_action_question: 下一步该点什么？
+    default_layout:
+      top:
+        - run_status_header
+        - command_panel
+      left:
+        - run_sidebar
+      center:
+        - run_timeline
+        - capability_results
+      right:
+        - report_artifacts
+        - delivery
+        - evidence
+      bottom:
+        - capability_readiness

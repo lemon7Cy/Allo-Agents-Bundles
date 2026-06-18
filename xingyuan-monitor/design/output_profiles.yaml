@@ -1,0 +1,33 @@
+status:
+  runtime_loaded: false
+  design_loaded: true
+  phase: phase-1-workbench
+  purpose: Output profile design for future Skill and Feishu integration.
+
+profiles:
+  monitor_card:
+    default: true
+    use_when: User asks for current status, diagnosis, risk, or operational summary.
+    sections:
+      - 状态
+      - 范围
+      - 信号
+      - 诊断
+      - 建议
+      - 缺口
+
+  feishu_interactive_card:
+    default: false
+    use_when: User explicitly asks for Feishu card, group update, or sendable report.
+    requires_skill: feishu-webhook-report
+    send_policy: preview_unless_explicit_send
+
+  diagnostic_report:
+    default: false
+    use_when: User explicitly asks for report, daily/weekly summary, or leadership-facing writeup.
+    sections:
+      - 摘要
+      - 指标
+      - 异常
+      - 证据
+      - 建议动作

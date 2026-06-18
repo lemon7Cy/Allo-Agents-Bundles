@@ -1,0 +1,176 @@
+{
+  "name": "dfcode-enterprise-mcp",
+  "version": "1.1.0",
+  "description": "DFCode Enterprise MCP Server for querying organization dashboard, usage analytics, user management, audit logs, and model endpoints.",
+  "author": "dfcode",
+  "type": "mcp",
+  "command": {
+    "exec": null,
+    "command": null,
+    "args": [],
+    "env": {
+      "X-API-Key": "$DFCODE_API_KEY"
+    },
+    "url": "http://119.45.112.196/mcp/sse"
+  },
+  "tools": [
+    {
+      "name": "query_dashboard",
+      "description": "Organization dashboard overview including today/7d/month usage stats, active members, model distribution, and top employees.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_usage",
+      "description": "Usage detail and aggregation queries with single and cross-dimension aggregation support.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_users",
+      "description": "Query member list and activity status.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_user_detail",
+      "description": "Query a specific member's profile including basic info, MAAS quota, device list, and roster status.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_employee_detail",
+      "description": "Query a specific member's detailed usage analysis including overview, daily trends, model distribution, and raw entries.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_audit_logs",
+      "description": "Query audit logs including admin operations, employee logins, and device authorizations.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_roster",
+      "description": "Query employee roster/directory with search by name, employee ID, department, and status.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_model_endpoints",
+      "description": "Query local model endpoint list including name, provider, status, and pricing.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_maas_models",
+      "description": "Query logical model list from MAAS gateway in real-time, including enabled status, groups, and capability tags.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_user_devices",
+      "description": "Query a specific member's device list.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_departments",
+      "description": "Cross-department analysis with range filters: usage, WoW growth, daily trends, model breakdown, and top employees per department.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_department_employee_detail",
+      "description": "Enriched admin employee detail: profile, MAAS summary, devices, usage overview, daily trends, model distribution, and paginated entries.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_employee_portal_stats",
+      "description": "Employee portal statistics for a specific user: summary, daily trend, model distribution, and optional 365-day activity heatmap.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_announcements",
+      "description": "Query announcement list with title, content, pinned status, and timestamps.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "query_feedback",
+      "description": "Query employee feedback list including content, submitter name, employee ID, department, and submission time.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  ],
+  "permissions": [
+    "enterprise-data",
+    "network",
+    "user-analytics",
+    "audit-logs"
+  ],
+  "required_env": [
+    "DFCODE_API_KEY"
+  ],
+  "optional_env": [],
+  "credentials": [
+    {
+      "key": "DFCODE_API_KEY",
+      "label": "DFCode API Key",
+      "description": "API key for authenticating with DFCode Enterprise MCP Server. Sent as X-API-Key header.",
+      "required": true,
+      "secret": true,
+      "docs_url": "https://admin.dfcode.com"
+    }
+  ],
+  "homepage": "https://admin.dfcode.com",
+  "notes": "SSE-based MCP connection. The API key is sent as X-API-Key header during SSE handshake and JSON-RPC requests.",
+  "source": "marketplace"
+}

@@ -1,0 +1,49 @@
+agent: xingyuan-monitor
+display_name: 星元枢算助手
+summary: 基于 Allo 底座的全平台监控诊断工作台，聚合 MaaS 监测、DFCode 后台分析和飞书卡片预览与上报能力。
+
+capabilities:
+  - id: maas-fleet-monitor
+    type: skill
+    label: MaaS Web 监测
+    required: false
+    role: observability
+    description: Query the MaaS read-only Web dashboard/API for usage, health, model ranking, cost, and chart summaries. Account/Pool diagnostics are deferred until MaaS provides a standard plugin/API.
+
+  - id: dfcode-enterprise-mcp
+    type: plugin
+    runtime: mcp
+    label: DFCode 后台分析
+    required: true
+    role: business-data
+    description: Query organization dashboard, usage, departments, members, devices, feedback, announcements, and audit logs.
+
+  - id: feishu-webhook-report
+    type: skill
+    label: 飞书上报（群机器人 Webhook）
+    required: false
+    role: notification
+    # 出站：通过飞书「自定义群机器人」的 Webhook URL（凭据 FEISHU_WEBHOOK_URL）推送卡片，仅发送、不接收。
+    # 入站 @ 回复是另一条路径，由飞书渠道（应用机器人 app_id/secret）处理，见 channels.feishu。
+    description: 通过飞书自定义群机器人的 Webhook URL（FEISHU_WEBHOOK_URL）出站推送监控卡片，仅发送、不接收消息。入站 @ 由飞书渠道（应用机器人）单独处理。
+
+policies:
+  response_style: monitor_card
+  report_style_only_on_explicit_request: true
+  readiness_board_business_api_calls: false
+  orchestration_owner: agent_bundle
+  no_self_skill_required: true
+  runtime_loaded_files:
+    - config.yaml
+    - SOUL.md
+    - capabilities.yaml
+  design_only_files_runtime_loaded: false
+  read_only_by_default: true
+  feishu_send_policy: explicit_send_sends_immediately
+  maas_private_mcp_enabled: false
+
+entry_prompts:
+  - 看一下 MaaS 和 DFCode 现在有什么需要关注的地方。
+  - 查一下今天哪个模型用量最高，主要来自哪里。
+  - 最近有没有错误、反馈或运营风险？
+  - 把这条监控摘要发送到飞书。

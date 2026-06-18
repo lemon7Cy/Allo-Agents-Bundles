@@ -1,0 +1,42 @@
+status:
+  runtime_loaded: false
+  design_loaded: true
+  phase: phase-1-workbench
+  purpose: Desktop workbench contract for Xingyuan Monitor.
+
+objects:
+  inspection_run:
+    status: idle | queued | running | completed | failed | cancelled
+    owns: runtime progress and stage message
+  snapshot:
+    owns: structured findings, risks, recommendations, and current health state
+  evidence:
+    owns: source, query scope, redacted payload summary, dashboard link, related finding ids
+  feishu_draft:
+    owns: preview, confirmation state, target label, send receipt
+
+phase_1:
+  implemented:
+    - desktop workbench shell
+    - capability readiness surface
+    - evidence model placeholder
+    - agent bundle orchestration boundary
+  not_implemented:
+    - real MaaS metric queries
+    - real Feishu draft generation
+    - persisted inspection run history
+    - scheduled inspections
+    - embedded workbench follow-up panel
+
+conversation_boundary:
+  current_behavior: no generic chat handoff from the workbench
+  future_behavior: natural language follow-up should stay inside the Xingyuan workbench and reference the active run, snapshot, evidence, and Feishu draft
+  rationale: Xingyuan Monitor is a customized Agent Bundle workbench, not a shortcut into a generic Allo chat session.
+
+capability_declarations:
+  declared_runtime_capabilities:
+    - maas-fleet-monitor
+    - dfcode-enterprise-mcp
+    - feishu-webhook-report
+  orchestration_owner: 星元枢算助手 Agent Bundle
+  reason: 星元枢算助手自身是定制智能体和编排层；能力编排应集中在该智能体上，外部 Skill/MCP 只提供可调用能力。

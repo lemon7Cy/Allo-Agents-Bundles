@@ -1,0 +1,33 @@
+status:
+  runtime_loaded: false
+  design_loaded: true
+  phase: phase-1-workbench
+  purpose: Feishu entry and delivery policy design. Actual sending is owned by Skill/channel capability, not this file.
+
+entrypoints:
+  bot_mention:
+    enabled_design: true
+    event_source: feishu mention event
+    target_agent: xingyuan-monitor
+    response_modes:
+      - text
+      - markdown
+      - interactive_card
+      - image
+
+delivery_policy:
+  default_action: preview
+  explicit_send_phrases:
+    - 发送到飞书
+    - 发群里
+    - 推送
+    - post now
+  preview_phrases:
+    - 草稿
+    - 预览
+    - 先看看
+    - 不要发送
+  sensitive_data:
+    redact_tokens: true
+    redact_api_keys: true
+    aggregate_user_level_data: true

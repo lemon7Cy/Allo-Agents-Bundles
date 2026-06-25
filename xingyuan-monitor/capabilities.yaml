@@ -1,49 +1,63 @@
 agent: xingyuan-monitor
 display_name: 星元枢算助手
-summary: 基于 Allo 底座的全平台监控诊断工作台，聚合 MaaS 监测、DFCode 后台分析和飞书卡片预览与上报能力。
-
+summary: 监控 MaaS/星元的运行信号,把零散观测整理成带风险研判的状态报告,并保持可直接发飞书的稳定措辞。
 capabilities:
-  - id: maas-fleet-monitor
-    type: skill
-    label: MaaS Web 监测
-    required: false
-    role: observability
-    description: Query the MaaS read-only Web dashboard/API for usage, health, model ranking, cost, and chart summaries. Account/Pool diagnostics are deferred until MaaS provides a standard plugin/API.
-
-  - id: dfcode-enterprise-mcp
-    type: plugin
-    runtime: mcp
-    label: DFCode 后台分析
+  - id: collect-maas-signals
+    type: workflow_step
+    label: Collect MaaS Signals
     required: true
-    role: business-data
-    description: Query organization dashboard, usage, departments, members, devices, feedback, announcements, and audit logs.
-
+    role: intake
+    description: Collects the user-provided monitoring window, service scope, symptoms, metrics, incident notes, and missing data points.
+  - id: interpret-health-status
+    type: workflow_step
+    label: Interpret Health Status
+    required: true
+    role: diagnosis
+    description: Converts sparse MaaS observations into a clear status level, evidence-backed diagnosis, and confidence notes.
+  - id: detect-operational-risks
+    type: review
+    label: Detect Operational Risks
+    required: false
+    role: risk
+    description: Identifies abnormal trends, missing telemetry, degraded components, and risks that need human follow-up.
+  - id: generate-feishu-monitor-card
+    type: workflow_step
+    label: Generate Feishu Monitor Report
+    required: false
+    role: reporting
+    description: Produces compact status text using stable labels so the Feishu channel can render readable monitor cards.
+  - id: scheduled-monitor-summary
+    type: workflow_step
+    label: Scheduled Monitor Summary
+    required: false
+    role: schedule
+    description: Supports recurring daily or periodic MaaS status summaries through the generic Agent scheduled-task layer.
   - id: feishu-webhook-report
     type: skill
-    label: 飞书上报（群机器人 Webhook）
+    label: 飞书 Webhook 上报
     required: false
-    role: notification
-    # 出站：通过飞书「自定义群机器人」的 Webhook URL（凭据 FEISHU_WEBHOOK_URL）推送卡片，仅发送、不接收。
-    # 入站 @ 回复是另一条路径，由飞书渠道（应用机器人 app_id/secret）处理，见 channels.feishu。
-    description: 通过飞书自定义群机器人的 Webhook URL（FEISHU_WEBHOOK_URL）出站推送监控卡片，仅发送、不接收消息。入站 @ 由飞书渠道（应用机器人）单独处理。
-
+    role: delivery
+    description: 通过飞书自建机器人 Webhook 推送监控报告(定时或手动)。随 bundle 内置于 skills/feishu-webhook-report。
+  - id: maas-fleet-monitor
+    type: skill
+    label: MaaS 集群监控
+    required: false
+    role: data
+    description: 读取只读的 MaaS Web 看板/API,获取集群用量、模型分布与健康信号。随 bundle 内置于 skills/maas-fleet-monitor。
+  - id: dfcode-enterprise-mcp
+    type: plugin
+    label: DFCode 企业分析
+    required: false
+    role: data
+    description: 企业看板、用量分析、成员、审计日志、模型端点的 MCP 服务。随 bundle 内置于 mcp/dfcode-enterprise-mcp.json。
 policies:
-  response_style: monitor_card
-  report_style_only_on_explicit_request: true
-  readiness_board_business_api_calls: false
-  orchestration_owner: agent_bundle
-  no_self_skill_required: true
-  runtime_loaded_files:
-    - config.yaml
-    - SOUL.md
-    - capabilities.yaml
-  design_only_files_runtime_loaded: false
-  read_only_by_default: true
-  feishu_send_policy: explicit_send_sends_immediately
-  maas_private_mcp_enabled: false
-
+  grounding: Do not invent MaaS metrics, incidents, service health, timestamps, owners, or recovery actions. Mark missing telemetry explicitly.
+  severity: Do not overstate severity. Separate confirmed incidents, weak signals, and information gaps.
+  feishu_format: Prefer stable labels such as 状态、范围、信号、指标、诊断、建议、缺口 when preparing Feishu monitor reports.
+  privacy: Avoid exposing customer-sensitive or system-sensitive details unless the user supplied them for the current monitoring task.
 entry_prompts:
-  - 看一下 MaaS 和 DFCode 现在有什么需要关注的地方。
-  - 查一下今天哪个模型用量最高，主要来自哪里。
-  - 最近有没有错误、反馈或运营风险？
-  - 把这条监控摘要发送到飞书。
+  - 汇总今日 MaaS/星元的运行健康度,用「状态/范围/信号/指标/诊断/建议/缺口」标签输出,缺失的遥测数据要明确标注。
+  - 评估这批 MaaS 观测数据,判断属于正常、关注、还是事故级风险。
+  - 把这段粗略的故障记录整理成可直接发飞书的星元监控报告,包含简洁诊断和下一步动作。
+  - 为星元生成一条每日定时监控指令,要求汇报健康信号、风险、数据缺口和建议跟进项。
+  - 帮我解释一个 MaaS 异常,不要编造缺失的指标或根因。

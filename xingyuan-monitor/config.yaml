@@ -4,13 +4,7 @@ type: agentic
 dashboard: full
 workspace_type: dashboard
 access: org
-# 模型与思考强度是星元身份的一部分，固定在 Bundle 里、对所有入口（看板/飞书）生效，
-# 不随 Allo 全局默认漂移；单次请求若显式传 model_name/thinking_enabled 仍可覆盖。
-# model 必须是部署 config.yaml 的 models[] 里存在的名字（缺失会回退到全局默认并打 warning）。
-# 当前服务端默认是 deepseek-v4-pro；可改为 kimi-for-coding / gpt-5.4 / zhipu-glm-5-1 等。
 model: deepseek-v4-pro
-thinking_enabled: true
-# reasoning_effort: medium   # 仅对声明 supports_reasoning_effort 的模型生效，deepseek-v4-pro 不支持，留空
-tool_groups: null
-# 星元用自己的 Agent 级实时数据存储，不走 Allo 的 per-user 聊天记忆。
 observation_store: true
+thinking_enabled: true
+reasoning_effort: medium

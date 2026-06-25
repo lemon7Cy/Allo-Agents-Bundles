@@ -28,8 +28,14 @@ Each direct child directory is one Agent Bundle:
 - `config.yaml` defines runtime identity, model defaults, dashboard routing, and access policy.
 - `SOUL.md` defines persona, behavior, output style, and safety boundaries.
 - `capabilities.yaml` declares Skill/MCP dependencies, entry prompts, and dashboard metadata.
-- `provision/` may ship installable Skill/MCP sources for one-click setup.
+- `provision/` may ship installable Skill/MCP sources for one-click setup (v1 layout).
 - `design/` is documentation only unless Allo explicitly implements a loader for a file.
+
+> **v2 (self-contained, per-agent isolated):** bundles may instead ship capabilities
+> at the root under `skills/` and `mcp/`, which load **only for that agent** (no
+> global install, not shared with the general assistant or other agents). See
+> [PROTOCOL-v2.md](PROTOCOL-v2.md) for the v1↔v2 comparison and the loading model.
+> `xingyuan-monitor` in this PR is migrated to v2.
 
 ## Access Fields
 

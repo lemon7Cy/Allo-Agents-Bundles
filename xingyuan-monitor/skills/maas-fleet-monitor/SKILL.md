@@ -60,21 +60,25 @@ For questions like:
 
 **Always run through the wrapper, from this skill's own directory** (the path shown in this skill's `<location>`). The wrapper auto-selects `.venv/bin/python` or `python3` and degrades gracefully if neither exists. Do **not** call `python scripts/web_status.py` directly and do **not** hardcode a `.venv` path.
 
+**Default: pull JSON and render a text monitor card + markdown table — no image.** This is the portable path (no Pillow, no chart generation, works on Windows):
+
 ```bash
-cd "<this skill directory>" && ./scripts/run_web_status.sh --format markdown
+cd "<this skill directory>" && ./scripts/run_web_status.sh --format json
 ```
 
-Raw structured data: `./scripts/run_web_status.sh --format json`.
+From the JSON, render a **monitor card** (状态 / 范围 / 信号 / 指标 / 诊断 / 建议 / 缺口) plus a compact markdown metrics table. Do **not** generate or reference chart images by default.
 
-**Degrade gracefully — never loop.** If the wrapper/script cannot run (no shell, no Python, write permission denied — e.g. a Windows host without a usable sandbox shell):
+**Only if the user explicitly asks for an image/chart** (e.g. "给我一张用量图"), try `--format markdown` (which renders PNG charts via Pillow). If charts are unavailable (no Pillow, no shell), do **not** retry — fall back to the card + table and note in 缺口 that the image is unavailable here.
 
-- Do **NOT** retry repeatedly, and do **NOT** spawn subagents to brute-force chart generation — that holds the conversation lock and blocks every following message.
-- Instead produce a **text-only monitor card** (状态 / 范围 / 信号 / 指标 / 诊断 / 建议 / 缺口) from the Web API JSON (or the user-provided data), and state in 缺口 that image/chart generation is unavailable in this environment. One attempt, then degrade.
+**Degrade gracefully — never loop.** If the wrapper/script cannot run at all (no shell, no Python, write permission denied — e.g. a Windows host without a usable sandbox shell):
+
+- Do **NOT** retry repeatedly, and do **NOT** spawn subagents to brute-force it — that holds the conversation lock and blocks every following message.
+- Produce the **text-only monitor card** from the user-provided data (or say the live data is unreachable), state the limitation in 缺口. One attempt, then degrade.
 
 Fallback rules:
 
-- If Markdown is returned, paste it with minimal edits and keep the image references.
-- If JSON is returned, answer from `today`, `week`, `instances`, `charts`, `files`, and `coverage_note`.
+- Default to JSON; answer from `today`, `week`, `instances`, `charts`, `files`, and `coverage_note`.
+- If Markdown was explicitly requested and returned, paste it with minimal edits.
 - If it returns `missing_web_password`, tell the operator to configure `MAAS_MONITOR_WEB_PASSWORD` in runtime credentials or environment.
 - If it returns `web_api_unreachable`, say the public Web dashboard/API is unreachable and include the dashboard URL for manual verification.
 - If it returns `python_not_found` (the wrapper's fallback), give the text monitor card and note that Python/charting is unavailable on this host — do not keep trying.
@@ -94,7 +98,7 @@ Answer with:
 
 - Default to a leadership-summary style for usage questions: concise, metric-first, no debugging transcript.
 - Start with one conclusion sentence, then one compact metrics block, then coverage notes.
-- For usage/status questions, include charts before the metrics table whenever chart paths are available.
+- Default to the monitor card + a compact metrics table; do not include chart images unless the user explicitly asked for one.
 - Do not show intermediate command execution details, raw URLs, curl errors, or JSON fields unless the user explicitly asks how the data was queried.
 - Do not include formulas or LaTeX-like fractions; write shares plainly, for example `gpt-5.5 占比约 82.8%`.
 - Keep leadership summaries to 5-8 short lines. Use a table only when it improves scanning.

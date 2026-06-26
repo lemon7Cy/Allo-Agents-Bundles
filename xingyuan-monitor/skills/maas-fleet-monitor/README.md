@@ -13,13 +13,13 @@ This project version lets ALLO query MaaS through the public read-only Web dashb
 Run the read-only Web report from this skill directory:
 
 ```bash
-cd /mnt/skills/custom/maas-fleet-monitor && ./.venv/bin/python scripts/web_status.py --format markdown
+./scripts/run_web_status.sh --format json
 ```
 
 Use JSON only for debugging or downstream structured processing:
 
 ```bash
-cd /mnt/skills/custom/maas-fleet-monitor && ./.venv/bin/python scripts/web_status.py --format json
+./scripts/run_web_status.sh --format json
 ```
 
 The script writes images and `summary.md` under a unique `maas-monitor-reports/runs/{run_id}` directory when artifacts are available. Do not reuse old chart files.

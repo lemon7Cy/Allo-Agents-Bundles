@@ -11,7 +11,7 @@ User asks:
 Run from this skill directory:
 
 ```bash
-cd /mnt/skills/custom/maas-fleet-monitor && ./.venv/bin/python scripts/web_status.py --format markdown
+./scripts/run_web_status.sh --format json
 ```
 
 Keep the embedded chart references and the compact metrics. Do not add data-channel details unless the user asks for troubleshooting.
@@ -21,7 +21,7 @@ Keep the embedded chart references and the compact metrics. Do not add data-chan
 Run:
 
 ```bash
-cd /mnt/skills/custom/maas-fleet-monitor && ./.venv/bin/python scripts/web_status.py --format json
+./scripts/run_web_status.sh --format json
 ```
 
 Answer from the returned `today`, `week`, and chart/file fields. If the Web payload lacks a requested window or model drilldown, mark it as a coverage gap.

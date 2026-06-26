@@ -11,7 +11,7 @@ Ask these in ALLO after enabling the Skill and configuring the Web dashboard pas
 Expected command:
 
 ```text
-cd /mnt/skills/custom/maas-fleet-monitor && ./.venv/bin/python scripts/web_status.py --format markdown
+./scripts/run_web_status.sh --format json
 ```
 
 Then answer with a concise summary and embedded chart references.
@@ -25,7 +25,7 @@ Then answer with a concise summary and embedded chart references.
 Expected command:
 
 ```text
-cd /mnt/skills/custom/maas-fleet-monitor && ./.venv/bin/python scripts/web_status.py --format json
+./scripts/run_web_status.sh --format json
 ```
 
 ## Error / Account / Provider Pool Detail

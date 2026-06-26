@@ -704,6 +704,16 @@ def summarize(instances: list[dict]) -> dict:
         if top_model
         else None,
         "top_model_share_percent": top_model_share,
+        # Full per-model ranking (top 5) so usage is fully attributed — not just the
+        # single top model (which left the rest looking "unattributed").
+        "model_breakdown": [
+            {
+                "model": m.get("model"),
+                "tokens_display": compact_number(m.get("total_tokens")),
+                "share_percent": round(raw_number(m.get("total_tokens")) / total_tokens * 100, 1) if total_tokens else 0,
+            }
+            for m in models[:5]
+        ],
     }
     week_summary = {
         "tokens": sum(raw_number(row.get("total_tokens")) for row in week_timeline),

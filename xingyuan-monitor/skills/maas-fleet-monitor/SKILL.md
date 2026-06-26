@@ -90,7 +90,7 @@ Answer with:
 - request count
 - cost when available
 - peak period
-- top model
+- model breakdown — list the full `model_breakdown` (top 5 models with token + share %), not just the single top model, so usage is fully attributed (no "未归属" gap)
 - healthy/degraded/limited instances
 - data coverage notes
 

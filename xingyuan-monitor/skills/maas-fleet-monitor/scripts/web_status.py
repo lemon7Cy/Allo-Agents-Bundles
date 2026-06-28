@@ -20,7 +20,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageFont
+try:
+    from PIL import Image, ImageDraw, ImageFont
+
+    HAS_PIL = True
+except ImportError:  # Pillow not installed: degrade to text/JSON, no charts.
+    Image = ImageDraw = ImageFont = None  # type: ignore[assignment]
+    HAS_PIL = False
 
 
 BASE_URL = os.getenv("MAAS_MONITOR_WEB_URL", "http://221.0.79.251:39091").rstrip("/")
@@ -29,6 +35,12 @@ PASSWORD = os.getenv("MAAS_MONITOR_WEB_PASSWORD", "")
 
 
 def default_report_root() -> Path:
+    # Prefer the real outputs dir the sandbox exposes (works on macOS where the
+    # /mnt/user-data symlink can't be created). Deliverables written here are
+    # picked up by present_files and IM channels as /mnt/user-data/outputs/*.
+    outputs_env = os.getenv("ALLO_OUTPUTS_DIR")
+    if outputs_env:
+        return Path(outputs_env).expanduser() / "maas-monitor-reports"
     outputs = Path("/mnt/user-data/outputs")
     if outputs.exists():
         return outputs / "maas-monitor-reports"
@@ -47,12 +59,29 @@ REPORT_ROOT = Path(
     os.getenv("MAAS_MONITOR_REPORT_DIR") or default_report_root()
 ).expanduser()
 REPORT_RUN_ID = os.getenv("MAAS_MONITOR_REPORT_RUN_ID") or run_id()
-REPORT_DIR = REPORT_ROOT / "runs" / REPORT_RUN_ID
-LATEST_DIR = REPORT_ROOT / "latest"
+# Inside the sandbox the outputs dir is already isolated per run/thread, so a
+# nested runs/<id> + latest/ layer is redundant — write flat. Standalone/CLI
+# runs (no ALLO_OUTPUTS_DIR) keep the runs/latest history layout.
+if os.getenv("ALLO_OUTPUTS_DIR"):
+    REPORT_DIR = REPORT_ROOT
+    LATEST_DIR = REPORT_ROOT
+else:
+    REPORT_DIR = REPORT_ROOT / "runs" / REPORT_RUN_ID
+    LATEST_DIR = REPORT_ROOT / "latest"
 
 
 def markdown_path(path: str) -> str:
     resolved = Path(path).expanduser().resolve(strict=False)
+    # Map the real outputs dir back to the virtual /mnt/user-data/outputs path so
+    # present_files / IM channels accept and resolve it.
+    outputs_env = os.getenv("ALLO_OUTPUTS_DIR")
+    if outputs_env:
+        try:
+            outputs_real = Path(outputs_env).expanduser().resolve(strict=False)
+            relative = resolved.relative_to(outputs_real)
+            return f"/mnt/user-data/outputs/{relative.as_posix()}"
+        except ValueError:
+            pass
     user_data = Path("/mnt/user-data").resolve(strict=False)
     try:
         relative = resolved.relative_to(user_data)
@@ -204,14 +233,12 @@ def overview_png(
     draw.text((56, 48), "MaaS 今日用量驾驶舱", fill="#0b2f43", font=title_font)
     draw.text(
         (58, 92),
-        "公网 MaaS 健康运行 · 用量核心集中在 gpt-5.5 · 内网 Agent 明细未接入",
+        "公网 MaaS 状态以 Web API 为准 · 用量核心集中在 gpt-5.5 · 内网 Agent 明细未接入",
         fill="#587084",
         font=sub_font,
     )
     draw.rounded_rectangle((925, 48, 1120, 90), radius=21, fill="#0f766e")
-    draw.text(
-        (955, 59), "PUBLIC HEALTHY", fill="#ecfeff", font=load_font(15, bold=True)
-    )
+    draw.text((965, 59), "PUBLIC WEB", fill="#ecfeff", font=load_font(15, bold=True))
 
     metric_card(
         draw,
@@ -575,7 +602,11 @@ def generate_report_assets(target: dict, today: dict, week: dict) -> dict:
     today_rows = timelines.get("day_hourly") or []
     week_rows = timelines.get("week_daily") or []
     day_models = target.get("token_usage", {}).get("day") or []
-    assets = {}
+    assets: dict = {}
+    # Charts need Pillow. Without it, return no charts — JSON / monitor-card and
+    # the textual report still work, so the agent never has to retry or loop.
+    if not HAS_PIL:
+        return assets
     assets["overview_chart"] = write_png(
         "maas_today_overview.png",
         overview_png(today, week, day_models, today_rows),
@@ -614,8 +645,9 @@ def write_report_files(summary: dict) -> dict:
     ]:
         if source:
             src = Path(source)
-            if src.exists() and src.is_file():
-                shutil.copy2(src, LATEST_DIR / src.name)
+            dest = LATEST_DIR / src.name
+            if src.exists() and src.is_file() and src.resolve() != dest.resolve():
+                shutil.copy2(src, dest)
     return {
         "run_id": REPORT_RUN_ID,
         "run_dir": str(REPORT_DIR),
@@ -672,6 +704,16 @@ def summarize(instances: list[dict]) -> dict:
         if top_model
         else None,
         "top_model_share_percent": top_model_share,
+        # Full per-model ranking (top 5) so usage is fully attributed — not just the
+        # single top model (which left the rest looking "unattributed").
+        "model_breakdown": [
+            {
+                "model": m.get("model"),
+                "tokens_display": compact_number(m.get("total_tokens")),
+                "share_percent": round(raw_number(m.get("total_tokens")) / total_tokens * 100, 1) if total_tokens else 0,
+            }
+            for m in models[:5]
+        ],
     }
     week_summary = {
         "tokens": sum(raw_number(row.get("total_tokens")) for row in week_timeline),
@@ -685,7 +727,6 @@ def summarize(instances: list[dict]) -> dict:
         "cost": round(sum(raw_number(row.get("cost")) for row in week_timeline), 2),
     }
     assets = generate_report_assets(target, today_summary, week_summary)
-    agent_metrics = build_agent_metrics(today_summary)
     return {
         "dashboard_url": f"{BASE_URL}/?v=metric1",
         "instances": [
@@ -700,39 +741,10 @@ def summarize(instances: list[dict]) -> dict:
         "today": today_summary,
         "week": week_summary,
         "charts": assets,
-        "metrics": agent_metrics["metrics"],
-        "metrics_line": agent_metrics["metrics_line"],
         "coverage_note": "internal-maas 尚未接入 Agent，详细模型/Token/账号/Pool 数据可能不可用。"
         if internal
         else None,
     }
-
-
-def build_agent_metrics(today: dict) -> dict:
-    """Structured metrics + a ready-to-use 指标 line for the Xingyuan monitor agent.
-
-    The monitor agent appends ``metrics_line`` to its monitor_card reply so the
-    observation memory can extract stable, comparable metrics for trend analysis
-    (see the agent bundle SOUL "指标行" convention). Keys are intentionally stable
-    English identifiers so the same metric aligns across days.
-    """
-    metrics = {
-        "token_total": {"value": today.get("tokens"), "unit": "token", "label": "今日 Token 总量"},
-        "requests": {"value": today.get("requests"), "unit": "次", "label": "今日请求数"},
-        "cost": {"value": today.get("cost"), "unit": None, "label": "今日费用"},
-        "top_model": {"value": today.get("top_model"), "unit": None, "label": "Top 模型"},
-    }
-    parts = []
-    if today.get("tokens") is not None:
-        parts.append(f"token_total={today['tokens']} token")
-    if today.get("requests") is not None:
-        parts.append(f"requests={today['requests']}")
-    if today.get("cost") is not None:
-        parts.append(f"cost={today['cost']}")
-    if today.get("top_model"):
-        parts.append(f"top_model={today['top_model']}")
-    metrics_line = ("指标：" + "; ".join(parts)) if parts else ""
-    return {"metrics": metrics, "metrics_line": metrics_line}
 
 
 def markdown_report(summary: dict) -> str:
@@ -740,8 +752,24 @@ def markdown_report(summary: dict) -> str:
     week = summary.get("week", {})
     charts = summary.get("charts", {})
     files = summary.get("files", {})
+    instances_raw = summary.get("instances")
+    instances: list[object] = instances_raw if isinstance(instances_raw, list) else []
+    public_status = next(
+        (
+            item.get("status")
+            for item in instances
+            if isinstance(item, dict) and item.get("id") == "public-maas"
+        ),
+        "unknown",
+    )
+    if public_status == "healthy":
+        conclusion = f"当前公网 MaaS 运行健康，今日用量主要集中在 {today.get('top_model') or 'Top 模型'}。"
+    elif public_status in {"degraded", "limited"}:
+        conclusion = f"当前公网 MaaS 可用但状态为 {public_status}，今日用量主要集中在 {today.get('top_model') or 'Top 模型'}。"
+    else:
+        conclusion = f"当前公网 MaaS 状态为 {public_status}，今日用量主要集中在 {today.get('top_model') or 'Top 模型'}。"
     lines = [
-        f"当前公网 MaaS 运行健康，今日用量主要集中在 {today.get('top_model') or 'Top 模型'}。",
+        conclusion,
         "",
         image_markdown(charts.get("overview_chart") or "", "MaaS 今日用量驾驶舱"),
         "",
@@ -765,7 +793,9 @@ def markdown_report(summary: dict) -> str:
     ]
     if summary.get("coverage_note"):
         lines.append(summary["coverage_note"])
-    lines.append("如需账号、Provider Pool、错误明细，可再进入技术诊断视图查询。")
+    lines.append(
+        "账号、Provider Pool、错误明细不属于当前 Web-only 覆盖范围，除非 Web payload 明确返回。"
+    )
     present_paths = [
         charts.get("overview_chart"),
         charts.get("model_usage_chart"),
@@ -851,8 +881,10 @@ def main() -> int:
     Path(files["data_json"]).write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    shutil.copy2(Path(files["summary_markdown"]), LATEST_DIR / "summary.md")
-    shutil.copy2(Path(files["data_json"]), LATEST_DIR / "data.json")
+    for _name, _src in (("summary.md", files["summary_markdown"]), ("data.json", files["data_json"])):
+        _dest = LATEST_DIR / _name
+        if Path(_src).resolve() != _dest.resolve():
+            shutil.copy2(Path(_src), _dest)
     if args.format == "markdown":
         print(markdown_report(summary))
     else:

@@ -39,11 +39,11 @@ capabilities:
     role: assessment
     description: 围绕创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性进行可解释评价。
   - id: incremental-evaluation
-    type: review
+    type: skill
     label: 初终稿增量评价
     required: false
     role: assessment
-    description: 对比初稿和终稿，识别结构、证据、数据分析、引用、结论和反思的具体改进与剩余风险。
+    description: 对比初稿和终稿，识别结构、证据、数据分析、引用、结论和反思的具体改进与剩余风险（随包 skill：skills/incremental-evaluation，雷达图）。
   - id: reflection-coach
     type: workflow_step
     label: 教学反思与成长建议

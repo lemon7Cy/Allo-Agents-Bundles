@@ -13,9 +13,13 @@
         "skills/incremental-evaluation/SKILL.md",
         "skills/incremental-evaluation/examples/sample-scores.json",
         "skills/incremental-evaluation/examples/初稿.md",
+        "skills/incremental-evaluation/examples/卡尔曼-强.json",
         "skills/incremental-evaluation/examples/终稿.md",
         "skills/incremental-evaluation/examples/课题.md",
+        "skills/incremental-evaluation/examples/锂电池-soc-soh.json",
+        "skills/incremental-evaluation/examples/锂电池-弱-单SOC.json",
         "skills/incremental-evaluation/requirements.txt",
+        "skills/incremental-evaluation/rubric.md",
         "skills/incremental-evaluation/scripts/render_eval.py",
         "workspace.yaml"
       ]
@@ -31,6 +35,7 @@
         "config.yaml",
         "skills/literature-review/SKILL.md",
         "skills/report-writing/SKILL.md",
+        "skills/report-writing/rubric.md",
         "skills/topic-mining/SKILL.md"
       ]
     },

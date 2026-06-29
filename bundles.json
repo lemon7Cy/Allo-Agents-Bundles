@@ -10,6 +10,7 @@
         "SOUL.md",
         "capabilities.yaml",
         "config.yaml",
+        "skills/draft-and-revision-coach/SKILL.md",
         "skills/incremental-evaluation/SKILL.md",
         "skills/incremental-evaluation/examples/sample-scores.json",
         "skills/incremental-evaluation/examples/初稿.md",
@@ -21,6 +22,8 @@
         "skills/incremental-evaluation/requirements.txt",
         "skills/incremental-evaluation/rubric.md",
         "skills/incremental-evaluation/scripts/render_eval.py",
+        "skills/literature-and-knowledge-guide/SKILL.md",
+        "skills/topic-exploration/SKILL.md",
         "workspace.yaml"
       ]
     },
@@ -36,7 +39,8 @@
         "skills/literature-review/SKILL.md",
         "skills/report-writing/SKILL.md",
         "skills/report-writing/rubric.md",
-        "skills/topic-mining/SKILL.md"
+        "skills/topic-mining/SKILL.md",
+        "workspace.yaml"
       ]
     },
     {

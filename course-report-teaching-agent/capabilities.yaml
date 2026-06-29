@@ -9,11 +9,11 @@ capabilities:
     role: orchestration
     description: 判断用户处于探索选题、撰写修订、评价反思或初终稿对比阶段，并组织合适的输出结构。
   - id: topic-exploration
-    type: workflow_step
+    type: skill
     label: 探索与选题
     required: true
     role: planning
-    description: 基于课程目标、学生兴趣、素材库、语料库和可用数据推荐课程报告选题，并评估创新性、可行性和风险。
+    description: 基于课程目标、学生兴趣、素材库、语料库和可用数据推荐课程报告选题，并评估创新性、可行性和风险（随包 skill：skills/topic-exploration）。
   - id: material-grounding
     type: rag
     label: 三库材料 Grounding
@@ -21,17 +21,17 @@ capabilities:
     role: grounding
     description: 区分素材库、语料库和指标库，将课程材料、数据、文献、范例和评价量规转化为观点-证据-反思映射。
   - id: literature-and-knowledge-guide
-    type: workflow_step
+    type: skill
     label: 文献导读与课程知识支持
     required: false
     role: knowledge
-    description: 提炼文献和课程材料中的关键观点，解释课程概念，提示引用质量和理论支撑风险。
+    description: 提炼文献和课程材料中的关键观点，解释课程概念，提示引用质量和理论支撑风险（随包 skill：skills/literature-and-knowledge-guide）。
   - id: draft-and-revision-coach
-    type: workflow_step
+    type: skill
     label: 撰写与修订辅导
     required: false
     role: writing
-    description: 生成课程报告提纲、分节写作建议、修改优先级和可替换改写示例，避免只做语言润色。
+    description: 生成课程报告提纲、分节写作建议、修改优先级和可替换改写示例，避免只做语言润色（随包 skill：skills/draft-and-revision-coach）。
   - id: six-dimension-evaluation
     type: review
     label: 六维评分与量规评价

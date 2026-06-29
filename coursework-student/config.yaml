@@ -3,9 +3,16 @@ bundle_version: 2
 description: 面向学生的课程报告助手——辅助探索选题、文献导读、撰写与修订，做认知伙伴而非代写。
 type: agentic
 dashboard: full
-workspace_type: dashboard
+# 学生端是"工作台"(workbench),不是"监控盘"(dashboard)——学生 agent 没有观测数据可监控,
+# 用 dashboard 会渲染成空的监控面板(单调)。workbench 读 workspace.yaml 出富面板(对称老师端)。
+workspace_type: workbench
 access: org
 model: deepseek-v4-pro
-observation_store: true
+# 学生要读自己上传的草稿/数据、跑可运行的示例代码、联网查文献。
+tool_groups:
+  - file:read
+  - file:write
+  - bash
+  - web
 thinking_enabled: true
 reasoning_effort: medium

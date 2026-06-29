@@ -1,0 +1,145 @@
+version: allo.workspace.v1
+agent: coursework-student
+
+metadata:
+  title: 课程报告助手（学生端）
+  subtitle: 你的报告认知伙伴：探索选题 → 撰写修订 → 自评提升
+  description: 面向学生的课程报告工作台，帮你自己探数据、读文献、定选题、搭框架、查初稿——做认知伙伴，不代写。
+  icon: book-open
+  theme:
+    accent: emerald
+    density: comfortable
+
+layout:
+  type: split
+  left:
+    width: 42
+    panels:
+      - workflow-overview
+      - my-materials
+      - six-dimension-rubric
+      - progress-checklist
+      - learning-boundary
+  right:
+    width: 58
+    panels:
+      - chat
+      - prompts
+      - capability-flow
+      - artifacts
+
+panels:
+  - id: workflow-overview
+    type: overview
+    title: 我的报告全流程
+    summary: 从"想不出选题"到"交出有底气的报告"，每一步我都帮你自己想得更深、写得更好。
+    items:
+      - 探索与选题：探你上传的数据、导读相关文献、挖你自己的兴趣点，收敛出不趋同的选题。
+      - 撰写与修订：给提纲/思路/问题清单/句式骨架和能看懂的示例代码，正文你自己写。
+      - 自评与提升：对照六维标准帮你自查初稿，指出差距和改进方向（和老师评审同一把尺子）。
+      - 红线：我是认知伙伴，不是代写工具——帮你把报告写得更好，但不替你写。
+
+  - id: my-materials
+    type: file_slots
+    title: 我的材料
+    description: 把你手上的东西放进来（或在对话里拖入、说明），我据此给针对性帮助，不杜撰。
+    slots:
+      - id: assignment-brief
+        label: 课程要求 / 作业说明
+        description: 报告主题范围、课程目标、格式要求、提交规范和截止时间。
+        accepts: [pdf, docx, md, txt]
+        required: false
+      - id: my-data
+        label: 我的数据 / 资料
+        description: 你要分析的数据集、实验记录、代码、图表等。
+        accepts: [csv, xlsx, pdf, docx, md, txt, py, ipynb]
+        multiple: true
+      - id: references
+        label: 参考文献
+        description: 你找到的文献、教材章节、课程 PPT，用于导读和引用核实。
+        accepts: [pdf, pptx, docx, md, txt]
+        multiple: true
+      - id: my-draft
+        label: 我的初稿
+        description: 写好的初稿，用于六维自查、找问题和改进方向（我只指方向，不替你改写）。
+        accepts: [docx, md, txt, pdf]
+
+  - id: six-dimension-rubric
+    type: table
+    title: 六维自查标准（和老师评审同一把尺子）
+    description: 对照自查初稿、找差距、定改进方向。按这里改好的地方，正是老师评审会加分的地方。
+    columns:
+      - id: dimension
+        label: 维度
+      - id: focus
+        label: 自查关注点
+      - id: risk
+        label: 常见硬伤
+    rows:
+      - dimension: 创新性
+        focus: 选题/角度/方法有没有自己的东西，避免同质化。
+        risk: 套模板、复刻某篇范文思路。
+      - dimension: 数据分析深度
+        focus: 有没有真分析（对比/机制/验证），不是堆数据贴图。
+        risk: 拿模拟数据冒充真实、只给数值不深挖。
+      - dimension: 完整性
+        focus: 问题—方法—结果—结论闭环是否完整。
+        risk: 关键节正文空缺、虎头蛇尾。
+      - dimension: 文献引用
+        focus: 引用是否规范、来源可核实、正文有角标、引文与列表闭环。
+        risk: 零文献、列了没引/引了没列。
+      - dimension: 结论合理性
+        focus: 结论是否由证据推出、有没有标注边界。
+        risk: 相对提升掩盖绝对误差、结论与图表矛盾。
+      - dimension: 格式规范性
+        focus: 结构/图表编号/公式/引用/排版是否规范。
+        risk: 图号断档、公式渲染乱、无参考文献。
+
+  - id: progress-checklist
+    type: checklist
+    title: 我的进度
+    items:
+      - 看清课程要求、报告目的、读者和提交规范。
+      - 探数据、读文献，挖出有自主性、不趋同的选题。
+      - 定选题，确认创新性、可行性和课程匹配度。
+      - 形成提纲和“观点-证据-反思”思路。
+      - 自己写完初稿。
+      - 按六维标准自查初稿，列出修改优先级。
+      - 根据反馈自己修订，保留关键修改依据。
+      - 定稿提交，必要时交给老师端做增量评价。
+
+  - id: learning-boundary
+    type: markdown_panel
+    title: 我的红线
+    markdown: |
+      - 我是认知伙伴，不是代写工具：帮你把报告写得更好，但正文你自己写。
+      - 你说“直接帮我写整段/整篇”，我会改成给你框架、思路和追问，逼你自己想清楚。
+      - 文献、数据、引用我都不杜撰，给你可核实的来源。
+      - 报告会被增量/能力评价，代写无助于你的真实水平和成绩——自己写、自己懂才划算。
+
+  - id: chat
+    type: agent_chat
+    title: 和报告助手对话
+    source:
+      agent: self
+
+  - id: prompts
+    type: entry_prompts
+    title: 常用任务
+    description: 常用任务来自 capabilities.entry_prompts，覆盖选题、文献导读、撰写支架和自评。
+    source:
+      prompts: capabilities.entry_prompts
+
+  - id: capability-flow
+    type: capability_board
+    title: 能力流程
+    description: 展示学生端声明的全流程能力和当前依赖状态。
+    source:
+      capabilities: self
+
+  - id: artifacts
+    type: artifact_list
+    title: 我的产物记录
+    description: 产物占位区，后续可接入选题方案、提纲、初稿诊断和自评记录。
+    filters:
+      kinds: [topic_plan, outline, draft_self_review, reflection]

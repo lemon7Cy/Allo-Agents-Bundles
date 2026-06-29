@@ -26,6 +26,12 @@ capabilities:
     required: false
     role: knowledge
     description: 提炼文献和课程材料中的关键观点，解释课程概念，提示引用质量和理论支撑风险（随包 skill：skills/literature-and-knowledge-guide）。
+  - id: mingxue-kb-query
+    type: skill
+    label: 明学知识库检索
+    required: false
+    role: knowledge
+    description: 查询明学 RAGFlow 知识库（电池/储能/SOC/SOH/RUL/Kalman/BMS 等），返回带出处的真实证据，用于选题文献支撑与核查学生引用（随包 skill：skills/mingxue-kb-query，需配置 MINGXUE_API_TOKEN）。
   - id: draft-and-revision-coach
     type: skill
     label: 撰写与修订辅导

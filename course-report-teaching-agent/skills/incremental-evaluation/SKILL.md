@@ -1,6 +1,6 @@
 ---
 name: incremental-evaluation
-description: Read this skill when the user wants to "review a course report," "score on the six dimensions," "compare the first draft and final draft," or "generate an incremental evaluation / radar chart." It turns the six-dimension evaluation from "just talk" into something "visualized and verifiable" — you (the LLM) score each draft on the six dimensions per the rubric and write the justification, while the script draws the radar chart and computes the increments. The core is incremental evaluation: it looks at the real improvement from first draft → final draft (sidestepping "was this written by AI").
+description: 'Read this skill when the user wants to "review a course report," "score on the six dimensions," "compare the first draft and final draft," or "generate an incremental evaluation / radar chart." It turns the six-dimension evaluation from "just talk" into something "visualized and verifiable" — you (the LLM) score each draft on the six dimensions per the rubric and write the justification, while the script draws the radar chart and computes the increments. The core is incremental evaluation: it looks at the real improvement from first draft to final draft (sidestepping "was this written by AI").'
 version: "1.0.0"
 author: allo-official
 ---

@@ -39,7 +39,7 @@ STDIN  (a single JSON object):
 
 STDOUT (JSON, see build_result() for the exact shape):
   scope, dept_daily, dept_weekly, overall, model_share, per_person,
-  growth, decline, recent_days_view, gaps
+  growth, decline, recent_days_view, week_over_week, gaps
 
 WORKDAY RULE
 ------------
@@ -593,6 +593,70 @@ def _recent_days_view(
     }
 
 
+def _week_over_week_view(cube: Cube) -> dict[str, Any]:
+    """Current ISO week's workdays vs the SAME weekdays of the previous week.
+
+    Why this exists in addition to recent_days_view: the rolling `recent_days` block
+    straddles week boundaries and is easily polluted by an odd low workday (e.g. a
+    near-zero Friday), so a real partial-week slide — this Mon/Tue far below last
+    Mon/Tue — can read as "up". Locking the comparison to MATCHING weekdays
+    week-over-week catches a department whose current-week workday level has dropped
+    even before the week is over, and is exactly the signal that a monthly +X%
+    aggregate hides. Pairs each current-week workday d with d-7 (same weekday).
+    """
+    wds = cube.workdays
+    empty = {
+        "current_week_monday": None, "prev_week_monday": None,
+        "current_workdays": [], "matched_prior_workdays": [],
+        "dept_wow_pct": 0.0, "by_weekday": [], "per_person_drops": [],
+    }
+    if not wds:
+        return empty
+    cur_monday = _iso_monday(wds[-1])
+    pairs = [(d, d - _dt.timedelta(days=7)) for d in sorted(d for d in wds if _iso_monday(d) == cur_monday)]
+    cur_set = {d for d, _ in pairs}
+    prev_set = {p for _, p in pairs}
+
+    by_date: dict[_dt.date, float] = {}
+    for r in cube.rows:
+        by_date[r["date"]] = by_date.get(r["date"], 0.0) + r["tokens"]
+
+    def avg(days: set[_dt.date]) -> float:
+        return (sum(by_date.get(d, 0.0) for d in days) / len(days)) if days else 0.0
+
+    dept_pct = _pct_change(avg(prev_set), avg(cur_set))
+    by_weekday = [
+        {
+            "current_date": d.isoformat(), "prior_date": p.isoformat(),
+            "current": round(by_date.get(d, 0.0), 2), "prior": round(by_date.get(p, 0.0), 2),
+            "pct": _pct_change(by_date.get(p, 0.0), by_date.get(d, 0.0)),
+        }
+        for d, p in pairs
+    ]
+
+    drops = []
+    for emp in cube.people():
+        per_day: dict[_dt.date, float] = {}
+        for r in _person_rows(cube, emp):
+            per_day[r["date"]] = per_day.get(r["date"], 0.0) + r["tokens"]
+        c = (sum(per_day.get(d, 0.0) for d in cur_set) / len(cur_set)) if cur_set else 0.0
+        pv = (sum(per_day.get(d, 0.0) for d in prev_set) / len(prev_set)) if prev_set else 0.0
+        if pv > SILENT_EPSILON and c < pv:
+            drops.append({"employee": emp, "prior_avg": round(pv, 2),
+                          "current_avg": round(c, 2), "drop_pct": _pct_change(pv, c)})
+    drops.sort(key=lambda x: (x["drop_pct"], x["employee"]))
+
+    return {
+        "current_week_monday": cur_monday.isoformat(),
+        "prev_week_monday": (cur_monday - _dt.timedelta(days=7)).isoformat(),
+        "current_workdays": [d.isoformat() for d in sorted(cur_set)],
+        "matched_prior_workdays": [d.isoformat() for d in sorted(prev_set)],
+        "dept_wow_pct": dept_pct,
+        "by_weekday": by_weekday,
+        "per_person_drops": drops,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Top-level assembly
 # ---------------------------------------------------------------------------
@@ -628,6 +692,7 @@ def build_result(payload: dict[str, Any]) -> dict[str, Any]:
     model_share = _model_share(cube)
     per_person = _per_person(cube, mondays, thresholds)
     recent_view = _recent_days_view(cube, per_person, recent_days)
+    wow_view = _week_over_week_view(cube)
 
     # growth / decline lists (capped at 8)
     growth = sorted(
@@ -681,6 +746,7 @@ def build_result(payload: dict[str, Any]) -> dict[str, Any]:
         "growth": [_clean(p) for p in growth],
         "decline": [_clean(p) for p in decline],
         "recent_days_view": recent_view,
+        "week_over_week": wow_view,
         "gaps": gaps,
     }
 
@@ -765,6 +831,29 @@ def render_markdown(result: dict[str, Any]) -> str:
             )
     else:
         lines.append("- 个人掉量: (none)")
+
+    wow = result.get("week_over_week", {})
+    lines.append("")
+    lines.append("## 本周 vs 上周（同工作日对齐, week_over_week）")
+    if wow.get("current_week_monday"):
+        lines.append(
+            f"- 本周({wow['current_week_monday']}) vs 上周({wow['prev_week_monday']})，"
+            f"只取本周已有工作日并配对同星期几: 部门同工作日均值 Δ={wow['dept_wow_pct']}%"
+        )
+        for b in wow.get("by_weekday", []):
+            lines.append(
+                f"  - {b['current_date']} {b['current']} vs {b['prior_date']} {b['prior']} (Δ{b['pct']}%)"
+            )
+        if wow.get("per_person_drops"):
+            lines.append("- 个人同工作日掉量(均值, 本周 vs 上周):")
+            for d in wow["per_person_drops"]:
+                lines.append(
+                    f"  - {d['employee']}: {d['prior_avg']} → {d['current_avg']} (Δ{d['drop_pct']}%)"
+                )
+        else:
+            lines.append("- 个人同工作日掉量: (none)")
+    else:
+        lines.append("- (无足够数据)")
 
     lines.append("")
     lines.append("## 缺口 (gaps)")
@@ -943,6 +1032,19 @@ def _selftest() -> int:
         check("eve_drop_pct", eve["drop_pct"] == -90.0, f"got {eve['drop_pct']}")
     check("eve_dept_pct", rv2["dept_recent_vs_prior_pct"] == -90.0,
           f"got {rv2['dept_recent_vs_prior_pct']}")
+
+    # ---- week_over_week (same-weekday): week2 (current) vs week1 (prior) ----
+    # current week = week of last workday 6/12 -> Monday 6/8; paired to 6/1 week.
+    wow = result["week_over_week"]
+    check("wow_current_week", wow["current_week_monday"] == "2026-06-08",
+          f"got {wow['current_week_monday']}")
+    check("wow_prev_week", wow["prev_week_monday"] == "2026-06-01",
+          f"got {wow['prev_week_monday']}")
+    # dept same-weekday avg: wk1 13000/5=2600 -> wk2 8501/5=1700.2 => -34.6%
+    check("wow_dept_pct", wow["dept_wow_pct"] == -34.6, f"got {wow['dept_wow_pct']}")
+    # Bob (1000->~0) and Dave (800->silent) drop same-weekday; Alice rose, Carol steady.
+    wow_drops = [d["employee"] for d in wow["per_person_drops"]]
+    check("wow_drops", "Bob" in wow_drops and "Dave" in wow_drops, f"got {wow_drops}")
 
     # ---- gaps must mention malformed rows ----
     check("gap_malformed", any("malformed" in g for g in result["gaps"]),

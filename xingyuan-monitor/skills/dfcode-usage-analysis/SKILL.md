@@ -184,7 +184,7 @@ STDIN JSON contract:
 }
 ```
 
-The engine returns (and the `--md` digest summarizes): `scope`, `dept_daily`, `dept_weekly`, `overall` (first/last week, `delta_pct`, `trend`, `inflection_weeks`), `model_share`, `per_person` (with `first_tokens`/`last_tokens`/`delta_pct`/`slope`/`top_model`/`class`/`model_trend`), `growth`, `decline`, `recent_days_view`, `gaps`.
+The engine returns (and the `--md` digest summarizes): `scope`, `dept_daily`, `dept_weekly`, `overall` (first/last week, `delta_pct`, `trend`, `inflection_weeks`), `model_share`, `per_person` (with `first_tokens`/`last_tokens`/`delta_pct`/`slope`/`top_model`/`class`/`model_trend`), `growth`, `decline`, `recent_days_view`, `week_over_week` (本周 vs 上周同工作日), `gaps`.
 
 - **Workday rule (engine enforces it)**: a date is a workday if (Mon–Fri AND not in `holidays`) OR (in `extra_workdays`). Pass known `holidays`/`extra_workdays` so 调休/节假日 are corrected; if you can't, the engine notes the approximation in `gaps`.
 - **Classification (engine, deterministic)**: growth = `delta_pct ≥ growth_pct AND slope > 0`; decline = `delta_pct ≤ -drop_pct` OR 由活转静 (was active then last `silent_days` workdays ~0); else steady.
@@ -193,6 +193,12 @@ The engine returns (and the `--md` digest summarizes): `scope`, `dept_daily`, `d
 ### 8.4 Recent-days questions ("最近两天用量下来了")
 
 Set `recent_days` to the window in question (e.g. `2`) and read `recent_days_view`: it compares the **last N workdays vs the preceding N workdays** (`dept_recent_vs_prior_pct`) and lists `per_person_drops` (prior_avg → recent_avg, drop_pct, last_active_date). This directly answers "谁最近掉量了". No in-context math.
+
+### 8.4b Department "用量降低了" (incl. mid/partial week) → read `week_over_week`, NOT just the month aggregate
+
+A monthly/period aggregate can read **+X% (up)** while a department is actually **dropping this week**, and the rolling `recent_days_view` block straddles week boundaries and is easily polluted by one odd low workday (e.g. a near-zero Friday), so it too can read "up". For "某部门用量降低了 / 视讯部门掉量了" questions the **authoritative signal is `week_over_week`**: it pairs each current-week workday with the **same weekday of the previous week** (本周一/二 ↔ 上周一/二), so a partial-week slide is caught cleanly even before the week is over. Read `dept_wow_pct`, the per-weekday `by_weekday` pairs, and `per_person_drops`.
+
+> ⚠️ **Headline the disagreement.** When the month says up but week-over-week says down, THAT is the story — e.g. "月环比 +262%(涨),但**本周工作日同比上周 −36%(降)** —— 月度把近周下降盖住了". Reporting only the month "+X%" and missing the recent workday drop is exactly the mistake that makes the conclusion wrong. Conversely, if `week_over_week` is roughly flat/up while a raw day looks low, it's likely a weekend/holiday artifact — don't cry decline.
 
 ### 8.5 The AI's job = interpretation ONLY
 
@@ -211,6 +217,7 @@ From the engine digest, write: **root cause**, **推测** (always mark inference
 - <姓名>:<最后活跃工作日> 后骤降/由活转静,疑因 <真降 / 换人 / 配额 / 请假>（推测），模型:<…>
 
 最近 N 工作日(如问及):部门 Δ<±X%>;个人掉量:<姓名 prior→recent (Δ-X%)>
+本周 vs 上周(同工作日,部门掉量问题必看):部门同工作日 Δ<±X%>(本周 <日/日> vs 上周同星期几);若与月环比方向相反,务必点出"月涨但近周工作日在降"
 粒度声明:本节所有数字取自确定性引擎(同口径:仅工作日、token、本周期、同一批人),未在上下文重算。
 缺口:<engine gaps 原样带出 + 数据不全/某人离岗待确认 等>
 ```

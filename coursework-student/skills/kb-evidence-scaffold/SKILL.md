@@ -1,6 +1,6 @@
 ---
 name: kb-evidence-scaffold
-description: 围绕课程报告选题,用明学知识库(电池/储能/SOC/SOH/RUL/Kalman/BMS 等)检索真实证据——正文证据块、论文图表、参考文献线索——给学生"读什么、重点读哪段/哪个图",支架学生自己读自己写。绝不代写、绝不杜撰。当选题落在该领域、学生要"查文献/找证据/有哪些论文/背景资料"时读本 skill。
+description: For a coursework report topic, use the 明学 knowledge base (battery/储能/SOC/SOH/RUL/Kalman/BMS, etc.) to retrieve real evidence — body-text evidence chunks, paper figures/tables, reference-list leads — and tell the student what to read and which section/figure to focus on, scaffolding them to read and write on their own. Never ghostwrite, never fabricate. Read this skill when the topic falls in this domain and the student wants to find literature, find evidence, see which papers exist, or get background material.
 tools: []
 version: "1.0.0"
 author: allo-official
@@ -15,46 +15,46 @@ credentials:
     secret: true
 ---
 
-# 明学知识库 · 证据脚手架(学生端)
+# 明学 Knowledge Base · Evidence Scaffold (Student Side)
 
-**定位:帮学生找到真实证据 + 一张阅读地图,让他自己读、自己写——不是替他读完写完。**
+**Purpose: help the student find real evidence + a reading map so they read and write it themselves — not read it through and write it for them.**
 
-## 覆盖域(用之前先判断)
-明学库覆盖 **锂电池 / 储能 / SOC / SOH / RUL / 容量衰减 / Kalman·EKF·UKF / BMS / OCV / 内阻** 等。
-- 选题在这些领域 → 优先用本库拿带出处的真证据。
-- 选题在覆盖域外 → **不要硬查**,回到 `literature-review` 的通用文献流程。
+## Coverage domain (judge before using)
+The 明学 knowledge base covers **lithium batteries / 储能 / SOC / SOH / RUL / capacity fade / Kalman·EKF·UKF / BMS / OCV / internal resistance**, etc.
+- Topic falls in these areas → prefer this knowledge base for real, sourced evidence.
+- Topic outside the coverage domain → **don't force a query**; fall back to the general literature flow in `literature-review`.
 
-## 三条证据通道(怎么用给学生)
-1. **chunks(正文证据)**:每块带 `section_type`(abstract/method/result/table)、`document`、`similarity`。→ 告诉学生"读哪篇、重点读哪一节"。
-2. **assets(论文图/表)**:`asset_type`=figure/table,带 caption / 表头 / 摘要。→ **学生端最有用**:指给他"去看这篇的 Fig3 / Table2,弄懂这个方法或趋势"。
-3. **reference_signals(参考文献线索)**:`research` 模式返回。→ "顺这些参考文献还能找到哪些论文"。
+## Three evidence channels (how to use them for the student)
+1. **chunks (body-text evidence)**: each chunk carries `section_type` (abstract/method/result/table), `document`, `similarity`. → Tell the student "which paper to read, which section to focus on".
+2. **assets (paper figures/tables)**: `asset_type`=figure/table, with caption / table header / abstract. → **Most useful on the student side**: point them to "go look at this paper's Fig3 / Table2 and grasp the method or trend".
+3. **reference_signals (reference-list leads)**: returned in `research` mode. → "what other papers you can find by following these references".
 
-## 如何调用(只用 search,不用 ask)
+## How to call (use search only, not ask)
 ```bash
 curl -sS -X POST "http://221.0.79.251:18091/api/search" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $MINGXUE_API_TOKEN" \
-  -d '{"question": "聚焦的检索问题", "top_k": 4, "mode": "answer", "include_assets": true}'
+  -d '{"question": "focused retrieval question", "top_k": 4, "mode": "answer", "include_assets": true}'
 ```
-- `mode`:默认 `answer`(找证据/方法);学生问"有哪些关键论文 / 研究脉络"时用 `research`。
-- `top_k`:快速看 3,常规 4-5,广证据 8。中文 query 会自动跨语言搜英文论文。
-- **只用 `/api/search`。绝不用 `/api/ask`** —— ask 会直接吐成段答案,等于代写,违背支架原则。
+- `mode`: defaults to `answer` (find evidence/methods); use `research` when the student asks "which key papers / the research thread".
+- `top_k`: 3 for a quick look, 4-5 for normal, 8 for broad evidence. A Chinese query automatically searches English papers cross-lingually.
+- **Use `/api/search` only. Never use `/api/ask`** — ask spits out a full prose answer, which equals ghostwriting and violates the scaffolding principle.
 
-## 查询规划(别堆术语)
-把学生的大问题拆成 2-4 个聚焦 query,每个 `top_k 3-5`,而不是一句塞十个术语。例:
+## Query planning (don't pile up jargon)
+Break the student's big question into 2-4 focused queries, each `top_k 3-5`, instead of cramming ten terms into one sentence. Examples:
 - `SOC 估计 OCV 安时积分 卡尔曼滤波`
 - `锂电池 SOH 容量衰减 内阻 循环寿命`
 
-合并证据时:去重相似块、优先 abstract/method/result/table 段而非通用 body;证据不足就再补一次聚焦 query,**不要用模型常识填**。
+When merging evidence: de-duplicate similar chunks, prefer abstract/method/result/table sections over generic body; if evidence is insufficient, run one more focused query — **do not fill in with the model's general knowledge**.
 
-## 铁律(支架不代写)
-- **search-only**:不用 `/api/ask` 生成成段答案。
-- **不拼综述正文**:给的是"证据块 + 出处 + 重点读哪段/哪个图 + 缺口",让学生自己消化、自己写。
-- **只引真实返回的文档**;查不到就说查不到,绝不编文献 / DOI / 数据。
-- 鼓励学生带问题读:"看这篇时注意它怎么定义 X、怎么验证 Y。"
-- **不要打印或泄露 token。**
+## Iron rules (scaffold, don't ghostwrite)
+- **search-only**: don't use `/api/ask` to generate a prose answer.
+- **Don't assemble the review body**: what you give is "evidence chunks + sources + which section/figure to focus on + gaps", letting the student digest and write it themselves.
+- **Cite only documents actually returned**; if nothing is found, say so — never fabricate references / DOIs / data.
+- Encourage the student to read with questions in mind: "while reading this paper, note how it defines X and how it validates Y."
+- **Do not print or leak the token.**
 
-## 给学生的输出模板
+## Output template for the student
 ```
 选题:<…>　覆盖域:命中明学库 ✅
 

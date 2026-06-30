@@ -1,31 +1,31 @@
 ---
 name: incremental-evaluation
-description: 当用户要「评审课程报告」「按六维打分」「对比初稿和终稿」「生成增量评价/雷达图」时读本 skill。把六维评价从"嘴上说"变成"可视化可核对"——你（LLM）负责依据量规给每份草稿六维打分并写出依据,脚本负责画雷达图和算增量。核心是增量评价:看的是初稿→终稿的真实提升(绕开"是不是 AI 写的")。
+description: Read this skill when the user wants to "review a course report," "score on the six dimensions," "compare the first draft and final draft," or "generate an incremental evaluation / radar chart." It turns the six-dimension evaluation from "just talk" into something "visualized and verifiable" — you (the LLM) score each draft on the six dimensions per the rubric and write the justification, while the script draws the radar chart and computes the increments. The core is incremental evaluation: it looks at the real improvement from first draft → final draft (sidestepping "was this written by AI").
 version: "1.0.0"
 author: allo-official
 ---
 
-# 六维增量评价（评审端杀手锏）
+# Six-Dimension Incremental Evaluation (the reviewer's killer feature)
 
-## 这个 skill 解决什么
-课程报告评价的痛点是"分不清学生真实水平 vs AI 代笔"。本 skill 的判分对象**不是某一稿绝对好坏,而是初稿→终稿的「增量」** —— 增量大、且有证据链,说明学生真的在 AI 协作中学到并提升了;增量空洞或只是润色,说明理解未深入。这就是「明学慧评」的增量式评价思路。
+## What this skill solves
+The pain point of evaluating course reports is "you can't tell a student's real level vs. AI ghostwriting." What this skill scores is **not the absolute quality of any single draft, but the "increment" from first draft → final draft** — a large increment backed by an evidence chain means the student genuinely learned and improved while collaborating with AI; a hollow increment or mere polishing means the understanding didn't deepen. This is exactly the incremental evaluation philosophy of 明学慧评.
 
-## 职责切分(硬规则)
-- **你(LLM)负责判断**:读草稿、按下面的六维量规给**每份草稿**打 0–100 分、每维写 1 句**依据**。判断必须有据,区分"有证据支撑""合理推测""待教师确认",缺材料不编造。
-- **脚本负责可视化**:雷达图 + 增量表由 `scripts/render_eval.py` 产出,**不要自己用文字画图**。
-- **教师权威**:你只给评价参考,不替代教师正式评分。
+## Division of responsibility (hard rules)
+- **You (the LLM) make the judgment**: read the drafts, score **each draft** 0–100 on the six-dimension rubric below, and write one sentence of **justification** per dimension. Judgments must be grounded — distinguish "supported by evidence," "reasonable inference," and "pending teacher confirmation"; do not fabricate when material is missing.
+- **The script handles visualization**: the radar chart + increment table are produced by `scripts/render_eval.py`; **do not draw charts yourself with text**.
+- **Teacher authority**: you only provide a reference evaluation; you do not replace the teacher's official grade.
 
-## 六维量规(指标库)
-六维 = **创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性**。
-**打分前必读本 skill 同目录的 `rubric.md`** —— 那里有每一维的 0–100 分档锚点(弱/中/强,取自真实样本),外加 **6 条深读硬扣分项**(数据真实性↔结论一致性、引用闭环、图号连续、跨章节数值自洽、相对vs绝对指标、评价基准正确性)和难度分层规则。**不读 rubric 直接拍脑袋打分不允许。**
+## Six-dimension rubric (metric library)
+The six dimensions = **创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性**.
+**Before scoring you must read `rubric.md` in this skill's directory** — it has the 0–100 band anchors for each dimension (weak/medium/strong, taken from real samples), plus **6 deep-read hard-deduction items** (data authenticity ↔ conclusion consistency, citation closure, figure-number continuity, cross-section numerical self-consistency, relative vs. absolute metrics, correctness of the evaluation baseline) and difficulty-tiering rules. **Scoring off the top of your head without reading the rubric is not allowed.**
 
-## 工作流程
+## Workflow
 
-### 1. 取草稿
-读用户上传/工作区里的初稿与终稿(`$ALLO_UPLOADS_DIR` / `$ALLO_WORKSPACE_PATH`)。只有一份稿时也能用(只出单稿画像,不出增量)。
+### 1. Get the drafts
+Read the first draft and final draft from the user's uploads / workspace (`$ALLO_UPLOADS_DIR` / `$ALLO_WORKSPACE_PATH`). It also works with only one draft (produces a single-draft profile only, no increment).
 
-### 2. 六维打分(你来做)
-**先读 `rubric.md` 落档**,再**跨模态深读**(公式/图/代码/表都要看,不能只看正文文字)并逐条过那 6 条硬扣分项。然后对**初稿**和**终稿**分别打分,写成一个 JSON(分数 0–100),`evidence` 每维一句话依据(必须引用草稿里的具体内容/数据,不得空泛):
+### 2. Six-dimension scoring (you do this)
+**First read `rubric.md` to pin down the bands**, then **deep-read across modalities** (formulas / figures / code / tables all must be examined, not just the body text) and go through those 6 hard-deduction items one by one. Then score the **first draft** and the **final draft** separately, written as a JSON (scores 0–100), with `evidence` giving one sentence of justification per dimension (must cite specific content/data from the draft, no vague generalities):
 
 ```json
 {
@@ -38,28 +38,28 @@ author: allo-official
 }
 ```
 
-把它写进工作区,例如 `scores.json`(对话不留多余文件,用临时目录亦可)。
+Write it into the workspace, e.g. `scores.json` (leave no extra files in the conversation; a temp directory is fine too).
 
-### 3. 出图 + 增量表(脚本来做)
+### 3. Render chart + increment table (the script does this)
 ```bash
 python3 scripts/render_eval.py --scores scores.json
 ```
-脚本会:① 打印**六维增量表**(初稿/终稿/Δ + 合计);② 在 `$ALLO_OUTPUTS_DIR` 生成**雷达图**(初稿 vs 终稿叠加);③ 无 matplotlib/中文字体时自动降级(表照出,图跳过或用 D1–D6 缩写),绝不报错中断。
+The script will: ① print the **six-dimension increment table** (初稿/终稿/Δ + total); ② generate a **radar chart** in `$ALLO_OUTPUTS_DIR` (初稿 vs 终稿 overlaid); ③ automatically degrade when matplotlib / a Chinese font is missing (the table still prints, the chart is skipped or uses the D1–D6 abbreviations), never erroring out and interrupting.
 
-依赖:`matplotlib`(见 requirements.txt);缺了也能出表。
+Dependency: `matplotlib` (see requirements.txt); the table still works without it.
 
-### 4. 给评价(你来做)
-基于增量表 + 雷达图,产出:
-- **增量亮点**:哪几维提升最大 + 对应的成长证据(引用终稿具体改动)。
-- **剩余风险**:哪几维仍弱、终稿还差什么。
-- **教师参考评语** + **追问学生的 3–5 个问题**(验证是否真理解,而非 AI 代笔)。
+### 4. Give the evaluation (you do this)
+Based on the increment table + radar chart, produce:
+- **Increment highlights**: which dimensions improved the most + the corresponding growth evidence (cite specific changes in the final draft).
+- **Remaining risks**: which dimensions are still weak, and what the final draft still lacks.
+- **Reference comments for the teacher** + **3–5 questions to ask the student** (to verify genuine understanding rather than AI ghostwriting).
 
-## 可选:AI 基线对照(更强的"是否真懂"判别)
-除"初稿 vs 终稿"外,可加第三条 series「AI独立解法」——让 agent 对同一课题独立产出一版,与"学生+AI 终稿"对比。若学生终稿在某些维度**超过** AI 独立解法,是学生真实理解的强证据。用法:在 `series` 里多加一项 `"AI独立解法": [...]` 即可,脚本会一并画进雷达图。
+## Optional: AI baseline comparison (a stronger "do they really understand" test)
+In addition to "初稿 vs 终稿," you can add a third series 「AI独立解法」 — have the agent independently produce a version of the same topic and compare it against the "student + AI final draft." If the student's final draft **exceeds** the AI's independent solution on some dimensions, that is strong evidence of genuine student understanding. Usage: just add one more entry `"AI独立解法": [...]` to `series`, and the script will draw it into the radar chart as well.
 
-## 示例
-`examples/` 下有一份合成样例(课题 + 初稿 + 终稿 + sample-scores.json),可直接:
+## Example
+Under `examples/` there is a synthetic sample (topic + first draft + final draft + sample-scores.json), which you can run directly:
 ```bash
 python3 scripts/render_eval.py --scores examples/sample-scores.json --title "示例:城市共享单车调度课程报告"
 ```
-用来快速验证流程、给教师看效果。
+Use it to quickly validate the workflow and show the teacher the result.

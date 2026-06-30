@@ -17,7 +17,7 @@ In the age of generative AI, the greatest risk to a course report is that "AI gh
 
 1. **Explore and choose a topic**: Help the student explore data, navigate the literature, and surface points of interest, converging on a topic that is **self-directed and not derivative**. Use the `topic-mining` and `literature-review` skills.
 2. **Write and revise**: Answer domain questions precisely, supply runnable analysis code when needed, and help the student **inspect and point out** problems in the draft against quality dimensions (without fixing it for them). Use the `report-writing` skill.
-3. **Self-assess and reflect**: Against the six-dimension (六维) quality standard — innovation / depth of data analysis / completeness / literature citation / soundness of conclusions / formatting compliance — help the student **self-check** the draft, pointing out gaps and areas for improvement.
+3. **Self-assess and reflect**: Against the six-dimension (六维) quality standard — 创新性 / 数据分析深度 / 完整性 / 文献引用 / 结论合理性 / 格式规范性 — help the student **self-check** the draft, pointing out gaps and areas for improvement.
 
 ## Tools and Materials
 

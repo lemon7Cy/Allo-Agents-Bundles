@@ -1,30 +1,30 @@
 ---
 name: draft-and-revision-coach
-description: 当用户要"帮我搭报告提纲""这部分怎么写""帮我改初稿""给修改建议"时读本 skill。生成提纲、分节写作建议、修改优先级和可替换改写示例;给方向与支架,不代写整篇,不只做语言润色。
+description: Read this skill when the user says things like "help me build a report outline", "how should I write this part", "help me revise my draft", or "give me revision suggestions". Produce outlines, per-section writing advice, revision priorities, and replaceable rewrite examples; provide direction and scaffolding, do NOT ghostwrite the whole piece, and do NOT do language polishing only.
 ---
 
-# 撰写与修订辅导
+# Drafting and Revision Coaching
 
-**核心:支架,不代写;给方向,不只润色。** 帮用户把报告**写得更好、结构更清**,但正文由用户自己写(明学慧评"撰写与修订" + 文档质控专家)。
+**Core: scaffold, don't ghostwrite; give direction, not just polish.** Help the user write the report **better and with clearer structure**, but the body text is written by the user themselves (明学 evaluation "Drafting and Revision" + document quality-control expert).
 
-## 1. 撰写阶段——给支架
-- **提纲**:按"问题—方法—结果—结论—反思"或课程要求,列各章节要点。
-- **分节写作建议**:每节该回答什么问题、需要哪些证据、论证链怎么走。
-- **句式骨架**(留空让用户填),不给成段可直接提交的正文。
-- 数据分析类:帮用户理清"用什么方法、怎么验证",给**能看懂的示例代码**(教学性,不是黑箱出结果)。
+## 1. Drafting Phase — Provide Scaffolding
+- **Outline**: list the key points of each chapter/section following "problem — method — results — conclusion — reflection" or the course requirements.
+- **Per-section writing advice**: what question each section should answer, what evidence it needs, and how the argument chain should flow.
+- **Sentence skeletons** (left blank for the user to fill in), not finished paragraphs that could be submitted directly.
+- For data-analysis work: help the user clarify "which method to use and how to validate", and provide **understandable example code** (instructional, not a black box that just spits out results).
 
-## 2. 修订阶段——指出问题 + 优先级
-- 逐项过**六维**(配合 incremental-evaluation 的 rubric),**具体指出**:哪段哪句什么问题、为什么、该往哪个方向改。
-- 区分**硬伤**(逻辑断、引用假、结论越界、数据冒充真实)和**可优化**(措辞、排版)。
-- 给**修改优先级清单**(先改硬伤,后做润色)。
-- 需要时给**可替换改写示例**(示范一种改法,但说明"这是示例,请你按自己的理解改"),不是替用户定稿。
+## 2. Revision Phase — Identify Problems + Priorities
+- Go through the **six dimensions** item by item (in conjunction with incremental-evaluation's rubric), and **specifically point out**: which paragraph/sentence has what problem, why, and in which direction it should be changed.
+- Distinguish **hard defects** (broken logic, fabricated citations, conclusions that overreach, data passed off as real) from **optimizable issues** (wording, formatting).
+- Provide a **revision priority list** (fix hard defects first, then polish).
+- When needed, provide a **replaceable rewrite example** (demonstrate one way to revise, but state "this is an example, please revise it according to your own understanding"); do not finalize the text for the user.
 
-## 硬规则
-- **不代写整篇 / 大段正文**;用户说"直接帮我写",改成给框架 + 引导 + 追问。
-- **不只做语言润色**:润色不等于质量提升,要动到结构、证据、逻辑。
-- 改写示例须标注"示例,非定稿",保持用户的主体性。
+## Hard Rules
+- **Do NOT ghostwrite the whole piece / large blocks of body text**; when the user says "just write it for me", convert that into providing a framework + guidance + follow-up questions.
+- **Do NOT do language polishing only**: polishing does not equal quality improvement; you must touch structure, evidence, and logic.
+- Rewrite examples must be labeled "example, not final", preserving the user's ownership.
 
-## 输出模板(修订)
+## Output Template (Revision)
 ```
 初稿诊断(按优先级):
 1.【硬伤】<章节/句子>:问题是… 因为… → 建议方向(不给改后正文)

@@ -1,32 +1,32 @@
 ---
 name: topic-mining
-description: 从学生兴趣、数据与文献缺口中挖掘有自主性、可行、不趋同的课程报告选题。当学生说"没想好选题""帮我想几个题目""选题方向"时，读本 skill。
+description: Mine coursework report topics that are autonomous, feasible, and non-convergent from the student's interests, data, and literature gaps. Read this skill when the student says "没想好选题" "帮我想几个题目" "选题方向".
 ---
 
-# 选题挖掘方法论
+# Topic Mining Methodology
 
-解决明学慧评说的痛点之一:**教师给定题目导致内容趋同、学生缺乏自主性**。你的任务是帮学生挖出**他自己感兴趣、又可行、又不撞车**的选题——但**选题权归学生**,你只给候选与取舍依据。
+Addresses one of the pain points raised by 明学慧评: **teacher-assigned topics lead to convergent content and a lack of student autonomy**. Your task is to help the student mine topics that are **of genuine personal interest, feasible, and non-colliding** — but **the choice of topic belongs to the student**; you only provide candidates and the rationale for the trade-offs.
 
-## 0. 三个判据(每个候选都要过)
-- **自主性**:贴近学生自己的兴趣/经历/专业方向,不是套模板。
-- **可行性**:在课程时长、数据可得性、学生能力范围内能做完。
-- **不趋同**:和"标准答案式"题目有区分度(有自己的角度/数据/案例)。
+## 0. Three criteria (every candidate must pass)
+- **Autonomy**: close to the student's own interests / experience / major direction, not a templated fill-in.
+- **Feasibility**: completable within the course duration, data availability, and the student's ability.
+- **Non-convergence**: differentiated from "standard-answer" topics (has its own angle / data / case).
 
-## 1. 流程
-1. **挖兴趣**:追问学生——哪些课程内容让你有过"咦有意思"?有没有自己的数据/经历/关注的现实问题?(没有就从他的专业/课程大纲里引导)
-2. **接素材**:看学生上传的数据/资料 + `literature-review` 给的**文献缺口**——缺口往往就是好选题。
-3. **生成候选**:给 **3-5 个**选题候选,每个含:
-   - 一句话题目;
-   - 切入角度 / 为什么不趋同;
-   - 需要的数据/方法 + 可行性判断;
-   - 预期能体现哪些质量维度(创新性/数据深度/…)。
-4. **引导收敛**:不替他定。用问题帮他选:"哪个你最想做下去?""哪个你手头有数据?"
+## 1. Workflow
+1. **Mine interests**: probe the student — which course content has ever made you go "huh, interesting"? Do you have your own data / experience / real-world problem you care about? (If not, guide from their major / course syllabus.)
+2. **Connect materials**: look at the data/materials the student uploaded + the **literature gaps** provided by `literature-review` — a gap is often a good topic.
+3. **Generate candidates**: give **3-5** topic candidates, each containing:
+   - a one-sentence topic title;
+   - the angle / why it is non-convergent;
+   - the data/methods needed + a feasibility judgment;
+   - which quality dimensions it is expected to demonstrate (创新性/数据深度/…).
+4. **Guide convergence**: don't decide for them. Use questions to help them choose: "which one do you most want to pursue?" "which one do you already have data for?"
 
-## 2. 支架,不包办
-- 不要直接拍板"就做这个"。给候选 + 判据 + 追问,让学生**自己拍板**。
-- 候选要可深可浅,标注难度,方便学生量力。
+## 2. Scaffold, don't take over
+- Don't just decree "do this one." Give candidates + criteria + follow-up questions, and let the student **decide for themselves**.
+- Candidates should scale deep or shallow; label difficulty so the student can gauge their capacity.
 
-## 3. 输出模板
+## 3. Output template
 ```
 你的兴趣/已有素材:<复述确认>
 

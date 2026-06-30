@@ -1,32 +1,32 @@
 ---
 name: literature-review
-description: 围绕课程报告选题做文献导读——检索、筛选、导读，给出可核实来源与阅读重点。当学生说"帮我查/导读文献""有哪些关键论文""背景资料"时，读本 skill。
+description: Literature guide for a course-report topic — search, filter, and annotate, producing verifiable sources and reading focus points. Read this skill when a student says "help me find / guide me through the literature", "which are the key papers", or "background material".
 ---
 
-# 文献导读方法论
+# Literature Guide Methodology
 
-帮学生**快速进入一个选题的文献版图**，但**绝不杜撰文献**。目标:让他知道"读什么、为什么读、重点读哪段",而不是替他读完写完。
+Help the student **quickly get oriented in the literature landscape of a topic**, but **never fabricate references**. The goal: let them know "what to read, why to read it, and which part to focus on" — not to read and write it for them.
 
-## 0. 铁律
-- **来源必须可核实**:每篇文献给出标题、作者/出处、年份、链接或检索词。**查不到就说查不到**,不要编造文献、DOI、数据。
-- 联网搜索用 web 工具;学生上传的资料用 `read_file` 读。
+## 0. Iron Rules
+- **Sources must be verifiable**: for each reference give the title, author/source, year, and a link or search query. **If you can't find it, say so** — do not invent references, DOIs, or data.
+- Use web tools for online search; use `read_file` for material the student uploads.
 
-## 1. 流程
-1. **澄清选题与场景**:课程、学科、选题方向、已有基础。模糊就先追问一句。
-2. **检索**:**选题在电池/储能/SOC/SOH 等领域时,优先用 `kb-evidence-scaffold` 检索明学知识库**(返回带出处的真实证据块),再补 web 搜索 + 学生上传材料。围绕选题的**核心概念 / 方法 / 典型应用 / 争议点**分别检索。
-3. **筛选**:优先 综述/被引高/权威出处/近 3-5 年;剔除明显不相关或不可核实的。
-4. **导读**(每篇给):
-   - 一句话核心观点 / 贡献;
-   - 与学生选题的关系(支撑 / 对照 / 方法借鉴 / 缺口);
-   - **建议精读的部分**(哪一节、哪个图表、哪个方法);
-   - 可核实来源。
-5. **版图小结**:这些文献共同勾勒出什么、还有哪些**缺口**(→ 交给 `topic-mining` 收敛选题)。
+## 1. Workflow
+1. **Clarify the topic and scenario**: course, discipline, topic direction, existing background. If vague, ask one follow-up question first.
+2. **Search**: **when the topic is in the battery/储能/SOC/SOH and similar domains, prefer `kb-evidence-scaffold` to search the 明学 knowledge base** (returns real evidence blocks with sources), then supplement with web search + the student's uploaded material. Search separately around the topic's **core concepts / methods / typical applications / points of controversy**.
+3. **Filter**: prioritize reviews / highly cited / authoritative sources / the last 3-5 years; remove clearly irrelevant or non-verifiable items.
+4. **Annotate** (for each reference give):
+   - one-sentence core viewpoint / contribution;
+   - relationship to the student's topic (supporting / contrasting / method borrowing / gap);
+   - **the part recommended for close reading** (which section, which figure/table, which method);
+   - a verifiable source.
+5. **Landscape summary**: what these references jointly outline, and what **gaps** remain (→ hand off to `topic-mining` to converge the topic).
 
-## 2. 支架,不代读
-- 不要直接给"文献综述成段正文"。给的是**清单 + 重点 + 缺口**,让学生自己读、自己写综述。
-- 鼓励学生带着问题读:"读这篇时,注意它怎么定义 X / 怎么验证 Y。"
+## 2. Scaffold, Not Reading-for-Them
+- Do not hand over a "literature-review section as finished prose". What you give is a **list + focus points + gaps**, so the student reads and writes the review themselves.
+- Encourage the student to read with a question in mind: "When reading this one, note how it defines X / how it validates Y."
 
-## 3. 输出模板
+## 3. Output Template
 ```
 选题:<…>　学科/课程:<…>
 

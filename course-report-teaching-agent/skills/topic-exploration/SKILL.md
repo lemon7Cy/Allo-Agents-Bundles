@@ -1,31 +1,31 @@
 ---
 name: topic-exploration
-description: 当用户(教师或学生)要"推荐选题""帮我想课程报告题目""评估这个选题行不行"时读本 skill。从课程目标+学生兴趣+可用素材+文献缺口里收敛出有自主性、不趋同的选题候选,并逐个评估创新性/可行性/数据可得性/课程匹配度/风险。
+description: Read this skill when a user (teacher or student) asks to "推荐选题", "帮我想课程报告题目", or "评估这个选题行不行". From course objectives + student interests + available materials + literature gaps, converge on topic candidates that are self-directed and non-convergent (not look-alike), and evaluate each one on 创新性 / 可行性 / 数据可得性 / 课程匹配度 / 风险.
 ---
 
-# 探索与选题方法论(教师视角)
+# Exploration and Topic-Selection Methodology (Teacher Perspective)
 
-**目标:帮学生找到"有自己的东西、不趋同、做得出来"的选题。** 不是替学生定题,而是给若干候选 + 取舍依据,让选择权在学生手里(明学慧评"赋予学生兴趣探索自主权")。
+**Goal: help the student find a topic that "has something of their own, does not converge with peers, and is actually doable".** Do not decide the topic for the student; instead, provide several candidates + the rationale for choosing among them, keeping the decision in the student's hands (明学慧评's principle of "giving students the autonomy to explore their interests").
 
-## 输入(缺则向用户要,不编造)
-- 课程目标 / 报告要求(范围、学时、提交规范)。
-- 学生兴趣方向、已有数据/资料(素材库)、可参考的文献/教材(语料库)。
+## Inputs (if missing, ask the user; do not fabricate)
+- Course objectives / report requirements (scope, credit hours, submission specs).
+- Student interest areas, existing data/materials (asset library), and reference literature/textbooks (corpus).
 
-## 产出:3–5 个选题候选,每个给五项评估
-| 维度 | 看什么 |
+## Output: 3–5 topic candidates, each scored on five dimensions
+| Dimension | What to look at |
 |---|---|
-| 创新性 | 角度/方法有没有自己的东西,避免和全班撞题。 |
-| 可行性 | 以本科生学时和能力能否做完。 |
-| 数据可得性 | 需要的数据/实验能不能拿到(优先用学生手上或公开数据集)。 |
-| 课程匹配度 | 是否扣住课程核心知识点和目标。 |
-| 风险 | 题目过大/过空、数据拿不到、方法超纲等。 |
+| 创新性 | Whether the angle/method has something of its own; avoid duplicating topics with the rest of the class. |
+| 可行性 | Whether it can be completed within an undergraduate's credit hours and ability. |
+| 数据可得性 | Whether the required data/experiments can be obtained (prefer data the student already has or public datasets). |
+| 课程匹配度 | Whether it stays anchored to the course's core knowledge points and objectives. |
+| 风险 | Topic too broad/too vague, data unobtainable, methods beyond the syllabus, etc. |
 
-## 硬规则
-- **不趋同**:明确避开"教师给定统一题目导致内容雷同"这个痛点,鼓励个性化。
-- **不杜撰**:不虚构数据集可得性、不假设学生没有的资源;拿不准的标"待确认"。
-- **给依据**:每个候选都说清"为什么推荐 / 取舍点在哪",让学生能自己判断。
+## Hard Rules
+- **No convergence**: explicitly avoid the pain point where "a uniform teacher-assigned topic leads to near-identical content"; encourage individualization.
+- **No fabrication**: do not invent dataset availability or assume resources the student does not have; mark anything uncertain as "待确认".
+- **Give the rationale**: for every candidate, spell out "why it is recommended / where the trade-off lies" so the student can judge for themselves.
 
-## 输出模板
+## Output Template
 ```
 选题候选(按推荐度排序):
 1.《…》创新性: … 可行性: … 数据: … 匹配: … 风险: … → 适合你如果…

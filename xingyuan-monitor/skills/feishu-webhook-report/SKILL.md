@@ -32,15 +32,15 @@ credentials:
 
 This skill sends reports, monitoring summaries, and incident alerts to a Feishu **group** using the **application bot** (`FEISHU_APP_ID` / `FEISHU_APP_SECRET`), addressed by the target group's `FEISHU_CHAT_ID`. Always transform the source content into a Feishu `interactive` card with a clean executive-summary layout. Use plain text only as a fallback when the card payload is too large or the user explicitly requests text.
 
-> **语言(硬规则):卡片的标题和正文一律用中文**——标题如「星元监控 | 日报」「星元告警 | MaaS 错误激增」,正文标签用「状态 / 范围 / 信号 / 诊断 / 建议」等中文。面向中文飞书群,**不论是用户手动让发、还是定时任务推送,标题口径都统一为中文**;只有用户明确要求英文时才用英文。下面 schema 里的英文示例只是结构示意,实际发送时翻成中文。
+> **Language (hard rule): card titles and body must always be in Chinese** — titles like 「星元监控 | 日报」「星元告警 | MaaS 错误激增」, and body labels in Chinese such as 「状态 / 范围 / 信号 / 诊断 / 建议」. For Chinese Feishu groups, **whether the user manually triggers the send or a scheduled task pushes it, the title convention is uniformly Chinese**; only use English when the user explicitly requests it. The English examples in the schema below are only structural illustrations — translate them into Chinese when actually sending.
 
 This skill is delivery-only. Generate and review the business content first, then use this skill to format and send it.
 
-**硬性规则（对话不产代码文件）**：发送/查询**只用内联 `python3 - <<'PY' … PY` heredoc 执行**，**绝不**在工作目录创建或保留任何 `.py` 脚本文件（例如 `send_feishu_*.py`）。对话就是对话——数据用环境变量/标准输入传入，执行完即结束，不在磁盘留脚本。
+**Hard rule (conversations must not produce code files)**: sending/querying is **executed only via an inline `python3 - <<'PY' … PY` heredoc**; **never** create or leave any `.py` script file (e.g. `send_feishu_*.py`) in the working directory. A conversation is just a conversation — pass data in via environment variables / standard input, finish execution and stop, leaving no script on disk.
 
 This is the **outbound** path (push a card into a group). Inbound group @ → reply is handled by the Allo Feishu *channel*, which uses the **same** application bot (`app_id` / `app_secret`, addressed by `chat_id`). So configure `FEISHU_APP_ID` / `FEISHU_APP_SECRET` once and both inbound and outbound work; this skill additionally needs `FEISHU_CHAT_ID` to know which group to post to. The bot must already be a member of that group.
 
-## 查群号 / Discover group chat_id
+## Discover group chat_id（查群号）
 
 When the user has added the bot to a group but doesn't know its `chat_id`, run this to list
 every group the bot is a member of, with each `chat_id` and name. Only needs

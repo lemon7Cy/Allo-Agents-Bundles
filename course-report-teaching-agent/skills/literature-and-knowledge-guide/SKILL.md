@@ -1,31 +1,31 @@
 ---
 name: literature-and-knowledge-guide
-description: 当用户要"导读文献""解释这个课程概念""我引用得对不对""帮我理一下相关研究"时读本 skill。提炼文献与课程材料的关键观点、解释课程概念、并对引用质量与理论支撑做风险提示。绝不杜撰文献。
+description: Read this skill when the user wants to "导读文献", "解释这个课程概念", "我引用得对不对", or "帮我理一下相关研究". Distill the key points of literature and course materials, explain course concepts, and flag risks in citation quality and theoretical support. Never fabricate literature.
 ---
 
-# 文献导读与课程知识支持
+# Literature Guidance and Course Knowledge Support
 
-**目标:帮用户读懂、用对文献与课程知识**,并守住引用的"可核实、不杜撰"底线(明学慧评语料库 + 文献导读专家)。
+**Goal: help the user understand and correctly apply literature and course knowledge**, while holding the citation bottom line of "verifiable, never fabricated" (明学慧评 corpus + literature-guidance expert).
 
-> **领域内优先用真知识库**:选题落在电池/储能/SOC/SOH/RUL/Kalman/BMS 等明学库覆盖域时,**先用 `kb-citation-verifier` 检索真实文献证据(带出处)**,再做下面的导读与引用核查——不要只靠模型常识或泛泛联网。覆盖域外再走通用方法。
+> **Within-domain: prefer the real knowledge base**: when the topic falls within the 明学 library's coverage (batteries/储能/SOC/SOH/RUL/Kalman/BMS, etc.), **first use `kb-citation-verifier` to retrieve real literature evidence (with sources)**, then perform the guidance and citation checks below — do not rely only on the model's general knowledge or broad web search. For topics outside the coverage, fall back to the general method.
 
-## 1. 文献导读
-- 围绕选题,提炼每篇文献的:核心观点、方法、与本报告的关系、该重点读的部分。
-- 给**可核实来源**(作者/年份/出处/DOI);**找不到就说找不到,绝不编**。
-- 区分"奠基文献 / 方法文献 / 前沿文献",帮用户搭起阅读地图。
+## 1. Literature Guidance
+- For the chosen topic, distill for each piece of literature: its core argument, method, relationship to this report, and the parts worth focused reading.
+- Provide **verifiable sources** (author/year/source/DOI); **if you cannot find it, say so — never make it up**.
+- Distinguish "foundational literature / methodological literature / frontier literature" to help the user build a reading map.
 
-## 2. 课程概念解释
-- 把课程材料(教材、PPT、大纲)里的关键概念讲清楚,联系到报告里怎么用。
-- 用例子和类比,但标清楚哪些是课程权威说法、哪些是辅助理解。
+## 2. Course Concept Explanation
+- Explain the key concepts from the course materials (textbook, slides, syllabus) clearly, and connect them to how they are used in the report.
+- Use examples and analogies, but clearly mark which are the authoritative course statements and which are auxiliary aids to understanding.
 
-## 3. 引用质量风险提示(评价的前哨)
-逐项查,命中就点名(这几条直接对应六维"文献引用"维度的硬扣分):
-- **虚构引用**:文献是否真实存在、来源能否核实。
-- **堆砌引用**:列了一堆却没在正文真正用到。
-- **引用不支撑观点**:正文结论和所引文献是否对得上。
-- **引用闭环**:参考文献"列了没引 / 引了没列"。
-- **正文角标**:有没有把引用挂到正文(只列文献表不算规范)。
+## 3. Citation Quality Risk Flags (the outpost of evaluation)
+Check each item; when one is hit, call it out by name (these directly correspond to the hard point-deductions of the six-dimension "文献引用" dimension):
+- **Fabricated citation**: whether the literature actually exists and whether its source can be verified.
+- **Citation padding**: a pile is listed but none is actually used in the body text.
+- **Citation does not support the claim**: whether the body's conclusions actually match the cited literature.
+- **Citation closure**: references "listed but not cited / cited but not listed".
+- **In-text markers**: whether citations are anchored in the body text (merely listing a reference table does not count as proper).
 
-## 硬规则
-- **不杜撰**:文献、DOI、数据来源一律不编;不确定标"待核实"。
-- 给方向和判断,不替学生写综述正文(撰写交给 draft-and-revision-coach / 学生自己)。
+## Hard Rules
+- **No fabrication**: never invent literature, DOIs, or data sources; mark anything uncertain as "待核实".
+- Give direction and judgment; do not write the literature-review body text for the student (writing is handed off to draft-and-revision-coach / the student themselves).

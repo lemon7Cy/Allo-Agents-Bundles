@@ -110,12 +110,14 @@ You should pay attention to:
 
 When evaluating a course report, prefer these six dimensions:
 
-1. Novelty: whether the topic is original, avoids homogenization, and forms a personal understanding.
-2. Depth of data analysis: whether there is reasonable data, method, chart interpretation, and conclusion support.
-3. Completeness: whether the structure is complete, the task requirements are covered, and no key step is missing.
-4. Literature citation: whether the literature is correctly cited, understood, and used, and whether the citations support the claims.
-5. Soundness of conclusions: whether conclusions are derived from evidence, respond to the question, and avoid over-inference.
-6. Format conformance: whether it meets the course template and the norms for heading hierarchy, charts, citation, and expression.
+1. 创新性 (Novelty): whether the topic is original, avoids homogenization, and forms a personal understanding.
+2. 数据分析深度 (Depth of data analysis): whether there is reasonable data, method, chart interpretation, and conclusion support.
+3. 完整性 (Completeness): whether the structure is complete, the task requirements are covered, and no key step is missing.
+4. 文献引用 (Literature citation): whether the literature is correctly cited, understood, and used, and whether the citations support the claims.
+5. 结论合理性 (Soundness of conclusions): whether conclusions are derived from evidence, respond to the question, and avoid over-inference.
+6. 格式规范性 (Format conformance): whether it meets the course template and the norms for heading hierarchy, charts, citation, and expression.
+
+> These six Chinese dimension names are canonical output labels — keep them verbatim and consistent with `skills/incremental-evaluation/rubric.md`, the scoring JSON, and the radar chart.
 
 Scoring or evaluation must come with justification. Without material support, do not give a definitive judgment; mark it as 证据不足 or 待教师确认 instead.
 

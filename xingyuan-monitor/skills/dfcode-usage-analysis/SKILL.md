@@ -141,45 +141,78 @@ Before answering, use the tools to rule these out, otherwise the conclusion will
 - When the group @-mentions the bot asking "谁在掉量 / 用户用量下降 / 掉量预警 / 用量下降提醒" → run this flow, **answer at user granularity**.
 - **Answer only when asked**; the reply goes back to the current group by default (the 飞书 channel handles this automatically), **no proactive scheduled push**.
 
-## 8. Deep Usage Analysis · Standard Operating Procedure (SOP)
+## 8. Deep Usage Analysis · Data-Model SOP (the engine computes; you only interpret)
 
-When asked for a **multi-dimensional deep analysis** (e.g.: "分析某部门本月工作日整体用量趋势,挑出谁持续增长/谁突然下降,各人模型使用也要趋势分析,对比粒度要一致"), **follow this procedure strictly** — efficient, consistent granularity, and holding to the «Query Budget Iron Rule» without blowing up.
+When asked for a **multi-dimensional deep analysis** (e.g.: "分析某部门本月工作日整体用量趋势,挑出谁持续增长/谁突然下降,各人模型使用也要趋势分析,对比粒度要一致") or a **recent-days drop** question ("最近两天用量下来了"), **do NOT compute trends, percentages, deltas, slopes, or growth/decline classification in your head/context.** The LLM does arithmetic badly and in-context computation is non-reproducible and blows up the context window. Instead, pull AGGREGATE data, normalize it into a fact cube, and hand the cube to a deterministic engine that does ALL the arithmetic. **Your only job is interpretation** (root cause / 推测 / 建议 / narrative) of the engine's digest.
 
-**Step 1 · Lock scope + one aggregate call for the base (key call-saver)**
-- First confirm four things: **department, period, whether to look at weekdays only, and scope (default token)**.
-- **One** `query_departments` call (filter=that department, range=that period, with `daily trends` + `WoW growth` + `model breakdown` + `top employees per dept`) → get in one shot: ① department daily totals ② per-person period comparison within the department ③ model distribution. **Don't replace this step with a per-person loop.**
-- **Weekdays only**: **drop Saturdays and Sundays** (and known holidays) from the daily trends before computing, to keep weekend noise out of the trend.
+### 8.1 The fact cube (data model — recall this first)
 
-**Step 2 · Overall trend (整体趋势, conclusion first)**
-- Use the "weekdays-only" daily trends to give the department's trajectory this month: rising / flat / falling + period-over-period X% + key inflection point (which day it started changing). The first sentence is the conclusion.
+One cube is the single source of truth; every view derives from it, so 口径 is consistent by construction:
 
-**Step 3 · Per-person classification (vertical: lock the person, watch time)**
-- Using each person's period series from Step 1, classify into two groups by "weekday token over time" (reuse Section 7's signals + rule out false declines):
-  - **Sustained growth (持续增长)**: the weekday series is basically monotonically rising / positive slope.
-  - **Sudden drop (突然下降)**: a sharp drop starting from some weekday / active-to-silent (由活转静).
-- List only the people the classification needs; don't spread out over everyone.
+- **dimensions**: `employee` × `department` × `date (YYYY-MM-DD)` × `model`
+- **measures**: `tokens`, `requests`
+- **derived (engine adds these — never compute yourself)**: `is_workday`, week bucket, weekly totals, deltas, slopes, model share, classification.
 
-**Step 4 · Model trend for key people (hard cap 3–5 people)**
-- Only for the **few fastest-growing + fastest-dropping people (≤ 3 each)** picked in Step 3, call `query_employee_detail` (`daily trend` + `model distribution`) → see **how their model usage changes over time** (switched models? a model rising/stopping?).
-- **Never** do this step for everyone (that's the blowup red line).
+### 8.2 Fixed, aggregate-only query plan (obey the «Query Budget Iron Rule» — ≤ 8 calls, NO raw entries)
 
-**Step 5 · Granularity-consistency check (per Section 3, mandatory)**
-- Lock all comparisons to **the same period, the same "weekdays-only" scope, the same token metric, the same set of people**;
-- Vertical = lock the person and watch time; horizontal = lock time and compare people; **never mix dimensions**.
+Lock scope first: **department, period, weekdays-only?, scope (default token)**. Then use a FIXED plan that returns AGGREGATES only — never raw paginated entries:
 
-**Step 6 · Structured output**
+1. **One `query_departments` call** (filter = that department, range = that period, with `daily trends` + `WoW growth` + `model breakdown` + `top employees per dept`) → gives, in one shot: ① department daily totals ② per-person period comparison within the dept ③ model distribution.
+2. If a **person × date × model** cross-tab is available as an aggregate (e.g. `query_usage` cross-dimension that returns sums, not rows), use it to fill per-person/per-model series. **Only if it returns aggregates** — never request raw entries.
+3. **Cap any per-person drill** (`query_employee_detail` / `query_employee_portal_stats`) to the **few standouts** the engine flags afterward (≤ 3 growth + ≤ 3 decline). Never loop over everyone — that is the blow-up red line.
+
+### 8.3 Normalize MCP results → the engine's `records`, then RUN the engine
+
+Flatten whatever the MCP returned into the cube's `records` list and pipe it into the engine. **Do the arithmetic in the engine, not in context.**
+
+```bash
+python3 skills/dfcode-usage-analysis/scripts/usage_cube.py --md   # reads JSON on STDIN, prints a markdown digest
+# (drop --md to get the full JSON instead)
 ```
-结论:<部门> 本月工作日用量 <升/降 X%>,主因 <…>。口径:仅工作日、token 计、本月。
 
-整体趋势:<按周/按天一句话 + 关键拐点>
+STDIN JSON contract:
+
+```json
+{
+  "records": [{"employee": "...", "department": "...", "date": "YYYY-MM-DD", "model": "...", "tokens": 0, "requests": 0}],
+  "period": {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"},
+  "workdays_only": true,
+  "holidays": ["YYYY-MM-DD"],
+  "extra_workdays": ["YYYY-MM-DD"],
+  "recent_days": 5,
+  "thresholds": {"growth_pct": 50, "drop_pct": 50, "silent_days": 5}
+}
+```
+
+The engine returns (and the `--md` digest summarizes): `scope`, `dept_daily`, `dept_weekly`, `overall` (first/last week, `delta_pct`, `trend`, `inflection_weeks`), `model_share`, `per_person` (with `first_tokens`/`last_tokens`/`delta_pct`/`slope`/`top_model`/`class`/`model_trend`), `growth`, `decline`, `recent_days_view`, `gaps`.
+
+- **Workday rule (engine enforces it)**: a date is a workday if (Mon–Fri AND not in `holidays`) OR (in `extra_workdays`). Pass known `holidays`/`extra_workdays` so 调休/节假日 are corrected; if you can't, the engine notes the approximation in `gaps`.
+- **Classification (engine, deterministic)**: growth = `delta_pct ≥ growth_pct AND slope > 0`; decline = `delta_pct ≤ -drop_pct` OR 由活转静 (was active then last `silent_days` workdays ~0); else steady.
+- **DO NOT** re-derive any of these numbers in context. If a number looks off, fix the `records` you fed in or the thresholds — don't hand-compute.
+
+### 8.4 Recent-days questions ("最近两天用量下来了")
+
+Set `recent_days` to the window in question (e.g. `2`) and read `recent_days_view`: it compares the **last N workdays vs the preceding N workdays** (`dept_recent_vs_prior_pct`) and lists `per_person_drops` (prior_avg → recent_avg, drop_pct, last_active_date). This directly answers "谁最近掉量了". No in-context math.
+
+### 8.5 The AI's job = interpretation ONLY
+
+From the engine digest, write: **root cause**, **推测** (always mark inferences as 推测), **建议**, and the narrative. Rule out false declines (Section 4/7.3: roster rotation / departure / quota / model retirement / holidays) and label causes. **Never re-derive trends, %, deltas, slopes, or the growth/decline split** — those are the engine's, and they must stay reproducible.
+
+### 8.6 Structured output (keep these Chinese labels)
+
+```
+结论:<部门> 本月工作日用量 <升/降 X%>,主因 <…>。口径:仅工作日、token 计、本月(引擎口径)。
+
+整体趋势:<按周一句话 + 关键拐点(取自 overall.inflection_weeks)>
 
 📈 持续增长(N 人):
-- <姓名>:<周期首 token> → <周期末 token>（Δ+X%），模型:<主用模型 + 变化趋势>
+- <姓名>:<周期首 token> → <周期末 token>（Δ+X%，slope>0），模型:<top_model + model_trend>
 📉 突然下降(M 人):
-- <姓名>:<最后活跃工作日> 后骤降/静默,疑因 <真降 / 换人 / 配额 / 请假>，模型:<…>
+- <姓名>:<最后活跃工作日> 后骤降/由活转静,疑因 <真降 / 换人 / 配额 / 请假>（推测），模型:<…>
 
-粒度声明:本节所有对比同口径(仅工作日、token、本月、同一批人)。
-缺口:<数据不全 / 某人离岗待确认 等,如有>
+最近 N 工作日(如问及):部门 Δ<±X%>;个人掉量:<姓名 prior→recent (Δ-X%)>
+粒度声明:本节所有数字取自确定性引擎(同口径:仅工作日、token、本周期、同一批人),未在上下文重算。
+缺口:<engine gaps 原样带出 + 数据不全/某人离岗待确认 等>
 ```
 
-> Self-check: this procedure's **total tool calls should be ~5–8** (1 aggregate + 3–5 key people). If you find yourself looping over employees one by one on `query_department_employee_detail`, **stop immediately** and return to Step 1's aggregate approach.
+> Self-check: **total MCP calls ~5–8** (1 aggregate + optional cross-dim + ≤ 3+3 standouts). If you catch yourself looping `query_department_employee_detail` over everyone, or doing arithmetic in your head, **stop** — return to 8.2's aggregate plan and let `usage_cube.py` do the math.

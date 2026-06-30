@@ -30,12 +30,12 @@ capabilities:
     required: false
     role: knowledge
     description: 围绕选题检索、筛选并导读文献，给出可核实来源与阅读重点，不杜撰文献。随 bundle 内置于 skills/literature-review。
-  - id: mingxue-kb-query
+  - id: kb-evidence-scaffold
     type: skill
-    label: 明学知识库检索
+    label: 明学知识库 · 证据脚手架
     required: false
     role: knowledge
-    description: 围绕选题查询明学 RAGFlow 知识库（电池/储能/SOC/SOH 等），返回带出处的真实证据让学生自己读自己写、不杜撰。随 bundle 内置于 skills/mingxue-kb-query（需配置 MINGXUE_API_TOKEN）。
+    description: 围绕选题用明学 RAGFlow 知识库（电池/储能/SOC/SOH 等）检索真实证据（正文/图表/参考文献），给学生阅读地图、支架自己读自己写，绝不代写、不杜撰。随 bundle 内置于 skills/kb-evidence-scaffold（需配置 MINGXUE_API_TOKEN）。
 
   - id: topic-mining
     type: skill

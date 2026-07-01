@@ -32,9 +32,14 @@ The 明学 base covers **lithium battery / 储能 / SOC / SOH / RUL / capacity f
 curl -sS -X POST "http://221.0.79.251:18091/api/search" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $MINGXUE_API_TOKEN" \
-  -d '{"question": "focused search question", "top_k": 5, "mode": "research", "include_assets": true}'
+  -d '{"question": "focused search question", "top_k": 5, "mode": "research", "include_assets": true, "dataset": "论文"}'
 ```
 - For citation verification use `mode: research` (preserves citation signals); for finding method/data evidence use `answer`. A Chinese query automatically searches English papers cross-lingually.
+- **`dataset` (which 明学 library to verify against — pick by the check; optional):**
+  - `论文` (**default** if omitted) — verify the student's **citations** against real research papers. This is the primary channel for citation verification.
+  - `教材` — the course textbook (《储能系统检测技术》): check a claim/concept against **authoritative course content** (for 选题 support and concept correctness), and cite "教材第 X 章" instead of only papers.
+  - `数据` — real experiment/OCV/test data, to corroborate the **数据分析** evaluation dimension against actual data.
+  - Omit `dataset` → papers. NOTE: `include_assets` (figures/tables) and `reference_signals` exist **only for the paper library**; for `教材/课件/数据` they come back empty — expected, use the body `chunks`.
 - The teacher is the evaluation authority and **may produce reviews/syntheses based on the search results** (not bound by the "ghostwriting" restriction). If the server has an LLM configured, use `/api/ask` for lesson preparation.
 
 ## Citation Verification Workflow (evidence-gathering means for the "文献引用" evaluation dimension)

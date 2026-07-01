@@ -34,10 +34,15 @@ The 明学 knowledge base covers **lithium batteries / 储能 / SOC / SOH / RUL 
 curl -sS -X POST "http://221.0.79.251:18091/api/search" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $MINGXUE_API_TOKEN" \
-  -d '{"question": "focused retrieval question", "top_k": 4, "mode": "answer", "include_assets": true}'
+  -d '{"question": "focused retrieval question", "top_k": 4, "mode": "answer", "include_assets": true, "dataset": "论文"}'
 ```
 - `mode`: defaults to `answer` (find evidence/methods); use `research` when the student asks "which key papers / the research thread".
 - `top_k`: 3 for a quick look, 4-5 for normal, 8 for broad evidence. A Chinese query automatically searches English papers cross-lingually.
+- **`dataset` (which 明学 library to search — pick by the student's intent; optional):**
+  - `教材` — the course textbook (《储能系统检测技术》): authoritative definitions, chapter concepts. Use it when the student needs to understand a concept or find "which chapter/section to read"; point them to the exact chapter.
+  - `论文` (**default** if omitted) — research papers: methods, results, related work — the evidence layer.
+  - `数据` — real experiment / OCV / test data, for a data-analysis section.
+  - Omit `dataset` → papers, same as before. NOTE: `include_assets` (figures/tables) exists **only for the paper library**; for `教材/课件/数据` the `assets` list comes back empty — that's expected, use the body `chunks`.
 - **Use `/api/search` only. Never use `/api/ask`** — ask spits out a full prose answer, which equals ghostwriting and violates the scaffolding principle.
 
 ## Query planning (don't pile up jargon)

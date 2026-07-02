@@ -1101,6 +1101,41 @@ def _selftest() -> int:
         check("intr_md_headline", "同窗对比" in imd and "禁止口径" in imd, "intraday md missing key labels")
     except Exception as exc:  # pragma: no cover
         check("intr_md_no_throw", False, f"render_intraday_markdown threw {exc!r}")
+
+    # ---- per-user / per-department expected-by-now view ----
+    # Org hourly: baseline hours 0..9 @100 (full 1000); today hours 0..4 @100; cutoff 5
+    # -> pace_ratio = 500/1000 = 0.5
+    iu_items = (
+        [{"hour": h, "date": "2026-06-10", "totalTokens": 100, "requests": 1} for h in range(10)]
+        + [{"hour": h, "date": "2026-06-11", "totalTokens": 100, "requests": 1} for h in range(5)]
+    )
+    iu_users = [
+        {"name": "甲", "department": "X", "baseline_tokens": 1000, "today_tokens": 200},   # expected 500 -> -60% drop
+        {"name": "乙", "department": "Y", "baseline_tokens": 400, "today_tokens": 600},    # expected 200 -> +200% rise
+        {"name": "丙", "department": "X", "baseline_tokens": 500, "today_tokens": 0},      # silent_today
+        {"name": "丁", "department": "Y", "baseline_tokens": 0, "today_tokens": 300},      # new
+    ]
+    iu = build_intraday_result({"items": iu_items, "cutoff_hour": 5, "users": iu_users})
+    check("iu_ratio", iu["pace_ratio"] == 0.5, f"got {iu['pace_ratio']}")
+    by_name = {u["name"]: u for u in iu["users"]}
+    check("iu_drop", by_name["甲"]["class"] == "drop" and by_name["甲"]["delta_vs_expected_pct"] == -60.0,
+          f"got {by_name['甲']}")
+    check("iu_rise", by_name["乙"]["class"] == "rise" and by_name["乙"]["delta_vs_expected_pct"] == 200.0,
+          f"got {by_name['乙']}")
+    check("iu_silent", by_name["丙"]["class"] == "silent_today", f"got {by_name['丙']['class']}")
+    check("iu_new", by_name["丁"]["class"] == "new", f"got {by_name['丁']['class']}")
+    by_dept = {d["department"]: d for d in iu["departments"]}
+    # dept X: baseline 1500, expected 750, today 200 -> -73.3%; dept Y: expected 200, today 900 -> +350%
+    check("iu_dept_x", by_dept["X"]["delta_vs_expected_pct"] == -73.3, f"got {by_dept['X']}")
+    check("iu_dept_y", by_dept["Y"]["delta_vs_expected_pct"] == 350.0, f"got {by_dept['Y']}")
+    check("iu_dept_order", iu["departments"][0]["department"] == "X", "drops should sort first")
+    check("iu_estimate_gap", any("估算" in g for g in iu["gaps"]), f"gaps={iu['gaps']}")
+    try:
+        iumd = render_intraday_markdown(iu)
+        check("iu_md_sections", "分部门" in iumd and "明显下降" in iumd and "今日未使用" in iumd,
+              "intraday md missing dept/drop sections")
+    except Exception as exc:  # pragma: no cover
+        check("iu_md_no_throw", False, f"render_intraday_markdown(users) threw {exc!r}")
     # empty input must not throw
     try:
         empty_intr = build_intraday_result({})
@@ -1253,14 +1288,82 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
         per_series.append(block)
     per_series.sort(key=lambda b: (-abs(b["window_delta_tokens"]), b["series"]))
 
+    # ---- per-user / per-department expected-by-now view ------------------
+    # Hourly data has no user/department dimension (and per-person hourly calls
+    # would blow the query budget), so we scale each user's BASELINE FULL DAY by
+    # the org-wide intraday pace ratio (org baseline window / org baseline full)
+    # to get an "expected by now" figure, then compare today's partial against
+    # THAT — an estimate (assumes shared intraday shape), always labeled 估算.
+    thresholds = {**DEFAULT_THRESHOLDS, **(payload.get("thresholds") or {})}
+    bw_tokens = overall["baseline_window"]["tokens"]
+    bf_tokens = overall["baseline_full_day"]["tokens"]
+    pace_ratio = round(bw_tokens / bf_tokens, 4) if bf_tokens > 0 else None
+    users_out: list[dict[str, Any]] = []
+    departments_out: list[dict[str, Any]] = []
+    raw_users = payload.get("users")
+    if isinstance(raw_users, list) and raw_users:
+        if pace_ratio is None:
+            gaps.append("baseline full-day tokens are 0 → cannot scale expected-by-now; per-user view skipped")
+        else:
+            dept_acc: dict[str, dict[str, float]] = {}
+            for u in raw_users:
+                if not isinstance(u, dict):
+                    continue
+                name = _str(u.get("name") or u.get("employee") or u.get("user")).strip() or "(unknown)"
+                dept = _str(u.get("department")).strip() or "(未分组)"
+                base_full = _num(u.get("baseline_tokens", u.get("baseline_full_tokens")))
+                today_tokens = _num(u.get("today_tokens", u.get("tokens")))
+                expected = round(base_full * pace_ratio, 2)
+                if base_full <= SILENT_EPSILON and today_tokens > SILENT_EPSILON:
+                    klass = "new"
+                    delta = None
+                elif base_full > SILENT_EPSILON and today_tokens <= SILENT_EPSILON:
+                    klass = "silent_today"
+                    delta = -100.0
+                else:
+                    delta = _pct_change(expected, today_tokens) if expected > SILENT_EPSILON else None
+                    if delta is not None and delta <= -float(thresholds["drop_pct"]):
+                        klass = "drop"
+                    elif delta is not None and delta >= float(thresholds["growth_pct"]):
+                        klass = "rise"
+                    else:
+                        klass = "steady"
+                users_out.append({
+                    "name": name,
+                    "department": dept,
+                    "baseline_full_tokens": round(base_full, 2),
+                    "expected_window_tokens": expected,
+                    "today_window_tokens": round(today_tokens, 2),
+                    "delta_vs_expected_pct": delta,
+                    "class": klass,
+                })
+                acc = dept_acc.setdefault(dept, {"baseline_full": 0.0, "today": 0.0})
+                acc["baseline_full"] += base_full
+                acc["today"] += today_tokens
+            for dept in sorted(dept_acc):
+                acc = dept_acc[dept]
+                d_expected = round(acc["baseline_full"] * pace_ratio, 2)
+                departments_out.append({
+                    "department": dept,
+                    "baseline_full_tokens": round(acc["baseline_full"], 2),
+                    "expected_window_tokens": d_expected,
+                    "today_window_tokens": round(acc["today"], 2),
+                    "delta_vs_expected_pct": _pct_change(d_expected, acc["today"]) if d_expected > SILENT_EPSILON else None,
+                })
+            departments_out.sort(key=lambda d: (d["delta_vs_expected_pct"] if d["delta_vs_expected_pct"] is not None else 0.0, d["department"]))
+            gaps.append(f"分部门/个人为估算口径:昨日整日 × 全局进度比 {pace_ratio}(假设各人日内节奏相同),非严格同窗")
+
     return {
         "mode": "intraday",
         "today": today,
         "baseline": baseline,
         "cutoff_hour": cutoff,
         "window_desc": f"两天均取 00:00–{cutoff:02d}:00 累计(同窗)",
+        "pace_ratio": pace_ratio,
         "overall": overall,
         "per_series": per_series,
+        "departments": departments_out,
+        "users": users_out,
         "gaps": gaps,
     }
 
@@ -1281,6 +1384,31 @@ def render_intraday_markdown(result: dict[str, Any]) -> str:
         lines += ["", "### 分序列同窗变化(按 |Δtokens| 排序)"]
         for b in result["per_series"][:10]:
             lines.append(f"- {b['series']}: {b['baseline_window']['tokens']:,.0f} → {b['today_window']['tokens']:,.0f}(Δ {b['same_window_delta_pct']:+.1f}%,{b['window_delta_tokens']:+,.0f} tokens)")
+
+    def _fmt_delta(v: float | None) -> str:
+        return f"{v:+.1f}%" if v is not None else "n/a"
+
+    if result.get("departments"):
+        lines += ["", "### 分部门(昨日整日×进度比=到此刻期望 vs 今日实际,估算)"]
+        for d in result["departments"]:
+            lines.append(f"- {d['department']}: 期望≈{d['expected_window_tokens']:,.0f} vs 实际 {d['today_window_tokens']:,.0f}(Δ {_fmt_delta(d['delta_vs_expected_pct'])})")
+    users = result.get("users") or []
+    drops = sorted([u for u in users if u["class"] in ("drop", "silent_today")], key=lambda u: (u["delta_vs_expected_pct"] if u["delta_vs_expected_pct"] is not None else -100.0))
+    rises = sorted([u for u in users if u["class"] == "rise"], key=lambda u: -(u["delta_vs_expected_pct"] or 0.0))
+    news = [u for u in users if u["class"] == "new"]
+    if drops:
+        lines += ["", f"### 📉 较期望明显下降({len(drops)} 人)"]
+        for u in drops[:8]:
+            tag = "今日未使用" if u["class"] == "silent_today" else f"Δ {_fmt_delta(u['delta_vs_expected_pct'])}"
+            lines.append(f"- {u['name']}·{u['department']}: 期望≈{u['expected_window_tokens']:,.0f} vs 实际 {u['today_window_tokens']:,.0f}({tag})")
+    if rises:
+        lines += ["", f"### 📈 较期望明显上升({len(rises)} 人)"]
+        for u in rises[:8]:
+            lines.append(f"- {u['name']}·{u['department']}: 期望≈{u['expected_window_tokens']:,.0f} vs 实际 {u['today_window_tokens']:,.0f}(Δ {_fmt_delta(u['delta_vs_expected_pct'])})")
+    if news:
+        lines += ["", f"### 🆕 昨日无用量、今日新增({len(news)} 人)"]
+        for u in news[:5]:
+            lines.append(f"- {u['name']}·{u['department']}: 今日 {u['today_window_tokens']:,.0f}")
     if result["gaps"]:
         lines += ["", "缺口: " + "; ".join(result["gaps"])]
     return "\n".join(lines)

@@ -613,7 +613,19 @@ def _week_over_week_view(cube: Cube) -> dict[str, Any]:
     if not wds:
         return empty
     cur_monday = _iso_monday(wds[-1])
-    pairs = [(d, d - _dt.timedelta(days=7)) for d in sorted(d for d in wds if _iso_monday(d) == cur_monday)]
+    all_pairs = [(d, d - _dt.timedelta(days=7)) for d in sorted(d for d in wds if _iso_monday(d) == cur_monday)]
+    # Drop pairs whose prior-week day predates the input period: outside-of-input
+    # days read as 0 tokens and every such pair scores +100%, skewing dept_wow_pct
+    # (real incident: a 6/29↔6/22 pair with 6/22 outside the fed period inflated
+    # the WoW to +8.7%). Feed a full previous week to get all pairs matched.
+    period_floor = wds[0]
+    pairs = [(d, p) for d, p in all_pairs if p >= period_floor]
+    dropped_pairs = len(all_pairs) - len(pairs)
+    if not pairs:
+        out = dict(empty)
+        out["dropped_unmatched_pairs"] = dropped_pairs
+        out["note"] = f"{dropped_pairs} 组配对的上周同星期几早于输入期首日,全部剔除——需喂入完整上一周才能做周同比"
+        return out
     cur_set = {d for d, _ in pairs}
     prev_set = {p for _, p in pairs}
 
@@ -646,7 +658,7 @@ def _week_over_week_view(cube: Cube) -> dict[str, Any]:
                           "current_avg": round(c, 2), "drop_pct": _pct_change(pv, c)})
     drops.sort(key=lambda x: (x["drop_pct"], x["employee"]))
 
-    return {
+    out = {
         "current_week_monday": cur_monday.isoformat(),
         "prev_week_monday": (cur_monday - _dt.timedelta(days=7)).isoformat(),
         "current_workdays": [d.isoformat() for d in sorted(cur_set)],
@@ -654,7 +666,11 @@ def _week_over_week_view(cube: Cube) -> dict[str, Any]:
         "dept_wow_pct": dept_pct,
         "by_weekday": by_weekday,
         "per_person_drops": drops,
+        "dropped_unmatched_pairs": dropped_pairs,
     }
+    if dropped_pairs:
+        out["note"] = f"{dropped_pairs} 组配对的上周同星期几早于输入期首日已剔除,周同比仅基于 {len(pairs)} 组完整配对"
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -723,6 +739,20 @@ def build_result(payload: dict[str, Any]) -> dict[str, Any]:
 
     if not cube.rows:
         cube.gaps.append("no usable records after filtering → empty result")
+
+    # Unequal-length weeks make the overall first-vs-last-week delta misleading
+    # (e.g. a 2-workday trailing week reads as a -X% "down" trend). Flag it so
+    # the reader leans on week_over_week (same-weekday pairing) instead.
+    if len(mondays) >= 2:
+        per_week_days = {mon: 0 for mon in mondays}
+        for d in cube.workdays:
+            mon = _iso_monday(d)
+            if mon in per_week_days:
+                per_week_days[mon] += 1
+        first_n, last_n = per_week_days[mondays[0]], per_week_days[mondays[-1]]
+        full_n = max(per_week_days.values())
+        if last_n < full_n or first_n < full_n:
+            cube.gaps.append(f"首/末周工作日数不等长(首周 {first_n} 天,末周 {last_n} 天,完整周 {full_n} 天)——overall 首末周对比含不完整周,趋势结论以 week_over_week(同星期几配对)为准")
 
     # strip internal fields before emitting
     def _clean(p: dict[str, Any]) -> dict[str, Any]:
@@ -1143,6 +1173,35 @@ def _selftest() -> int:
     check("iw_strict_gap", any("严格同窗" in g for g in iw["gaps"]) and not any("估算口径" in g for g in iw["gaps"]),
           f"gaps={iw['gaps']}")
     check("iw_md_caption", "严格同窗" in render_intraday_markdown(iw), "windowed md caption missing")
+    # windowed users covering less than the org window → unattributed disclosure.
+    # org baseline window = 500; single user covers 300 → 200 (40%) undisclosed.
+    iw2 = build_intraday_result({"items": iu_items, "cutoff_hour": 5, "users_are_windowed": True, "users": [
+        {"name": "甲", "department": "X", "baseline_tokens": 300, "today_tokens": 100},
+    ]})
+    check("iw2_unattributed", any("未纳入分人视图" in g for g in iw2["gaps"]), f"gaps={iw2['gaps']}")
+    # iw (users sum 700 > org 500) must NOT emit the disclosure (no positive diff)
+    check("iw_no_false_unattributed", not any("未纳入分人视图" in g for g in iw["gaps"]), f"gaps={iw['gaps']}")
+
+    # ---- week_over_week: prior-week days outside the input period are dropped ----
+    # Single week fed (6/8-6/12): every prior-week pair predates the period → all
+    # dropped, view degrades gracefully with a note instead of a fake +100% WoW.
+    wow_single = build_result({
+        "records": [{"employee": "A", "department": "D", "date": f"2026-06-{d:02d}", "model": "m", "tokens": 100, "requests": 1} for d in range(8, 13)],
+        "period": {"start": "2026-06-08", "end": "2026-06-12"}, "workdays_only": True,
+    })["week_over_week"]
+    check("wow_dropped_all", wow_single["dropped_unmatched_pairs"] == 5 and wow_single["dept_wow_pct"] == 0.0,
+          f"got {wow_single['dropped_unmatched_pairs']} / {wow_single['dept_wow_pct']}")
+    check("wow_dropped_note", "剔除" in (wow_single.get("note") or ""), f"note={wow_single.get('note')}")
+    # main two-full-week dataset: nothing dropped (regression guard)
+    check("wow_none_dropped", result["week_over_week"]["dropped_unmatched_pairs"] == 0,
+          f"got {result['week_over_week']['dropped_unmatched_pairs']}")
+
+    # ---- unequal-length weeks flagged in gaps ----
+    partial_wk = build_result({
+        "records": [{"employee": "A", "department": "D", "date": f"2026-06-{d:02d}", "model": "m", "tokens": 100, "requests": 1} for d in [8, 9, 10, 11, 12, 15, 16]],
+        "period": {"start": "2026-06-08", "end": "2026-06-16"}, "workdays_only": True,
+    })
+    check("partial_week_gap", any("不等长" in g for g in partial_wk["gaps"]), f"gaps={partial_wk['gaps']}")
     try:
         iumd = render_intraday_markdown(iu)
         check("iu_md_sections", "分部门" in iumd and "明显下降" in iumd and "今日未使用" in iumd,
@@ -1372,6 +1431,15 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
             departments_out.sort(key=lambda d: (d["delta_vs_expected_pct"] if d["delta_vs_expected_pct"] is not None else 0.0, d["department"]))
             if users_windowed:
                 gaps.append("分部门/个人为严格同窗口径(query_usage hourTo 窗口聚合),与总量同窗一致")
+                # Disclose usage NOT covered by the per-user list (excluded
+                # unassigned people, truncated rows, unattributed records) so
+                # the org headline and the per-person view reconcile openly.
+                attr_base = sum(u["baseline_full_tokens"] for u in users_out)
+                attr_today = sum(u["today_window_tokens"] for u in users_out)
+                for label, attr, total_tokens in (("基线日", attr_base, overall["baseline_window"]["tokens"]), ("今日", attr_today, overall["today_window"]["tokens"])):
+                    diff = total_tokens - attr
+                    if total_tokens > 0 and diff / total_tokens > 0.005:
+                        gaps.append(f"{label}同窗总量 {total_tokens:,.0f} 比分人加总 {attr:,.0f} 多 {diff:,.0f}(约 {diff / total_tokens * 100:.1f}%,未分配人员/未列入用户/未归属记录),未纳入分人视图")
             else:
                 gaps.append(f"分部门/个人为估算口径:昨日整日 × 全局进度比 {pace_ratio}(假设各人日内节奏相同),非严格同窗;服务端已支持 hourTo 时请改用严格同窗")
 

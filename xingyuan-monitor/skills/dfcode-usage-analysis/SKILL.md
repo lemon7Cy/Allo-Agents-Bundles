@@ -27,7 +27,8 @@ The dfcode tools can return a **huge** amount of data in a single call; a few ca
 ## 1. Data Scope (most important — get it wrong and everything's wrong)
 
 - **People with no assigned department = not company personnel; exclude outright.** In reports, **don't count, don't rank, don't show them, and don't suggest "confirming their department assignment"** — they're noise, treat them as nonexistent.
-- **Only count people with an assigned department.** Determine assignment via `query_roster` (by department/status) or the department dimension of `query_departments`; drop anyone with `department=null` / no department / non-staff (编外) status.
+- **Only count people with an assigned department.** Determine assignment via `query_roster` (by department/status) or the department dimension of `query_departments`; drop anyone with `department=null` / no department / non-staff (编外) status. ⚠️ **"Unassigned" is encoded as the LITERAL STRING 「未设置」 in the roster (not null/empty)** — treat 「未设置」 and obvious placeholder department names (e.g. `maas-migration-smoke`) as unassigned too, or they leak into per-department conclusions as a fake department.
+- When the per-person view covers less than the org total (excluded unassigned people, truncation), **disclose the uncovered amount in one line** — the engine's intraday mode does this automatically ("未纳入分人视图").
 - Default to **aggregating by department**; drill down to individuals only when needed (and only within assigned departments).
 - At the end of the conclusion, declare the scope in one line, e.g.: `口径:仅已分配部门(已排除未分配人员)。用量以 token 计。`
 - ⚠️ Don't list someone or suggest assigning them just because an unassigned person has high usage — **high usage but unassigned = still excluded**; at most summarize it in the gaps section with one line "另有未分配人员用量未纳入", without naming names.
@@ -117,6 +118,13 @@ When a department's usage changes, answer along this chain:
 | Global overview (today/7d/month, active headcount, model distribution) | `query_dashboard` |
 | Cross-dimension aggregation | `query_usage` (`groupBy`: model/project/user/day/**hour**/agent + crosses `user_model`/`model_day`/`user_day`/**`hour_day`**/`model_hour`; filters: `from`/`to`/`userId`/`model`/`project`/**`hourFrom`/`hourTo`**) |
 | **Same-window "today vs yesterday" (§3b)** | headline: `query_usage {from,to, groupBy:"hour_day"}`; per-user/model strict window: `query_usage {from=to=当日, groupBy:"user", hourTo:H}` ×2 days → pipe to `usage_cube.py --intraday` with `users_are_windowed:true` |
+
+### 5.1 Tool behavior notes (measured — pitfalls that flip conclusions)
+
+- **Aggregate row cap**: `query_usage` aggregations return at most `pageSize` rows (default 50, **max 1000**), ranked by **total tokens desc**. For multi-day crosses (`user_day` over N days ≈ users×N rows) **always pass a large `pageSize`** and reconcile against `groupBy:"day"` totals — a silent truncation rewrites the decline list.
+- **`query_roster` paginates** (default 20/page, max 100): read `total` and page through, or 3/4 of the roster reads as "no department". Roster rows carry **`userId`** — use it directly for `query_user_detail` / `query_employee_detail` (the employeeId/工号 is NOT a userId).
+- **`query_employee_portal_stats` 已知缺陷**: its range parameter is ignored (always month-to-date) and the 365-day heatmap returns empty — near month-start it cannot confirm a sustained decline. Use `query_usage {groupBy:"user_day", userId}` for a per-person daily trend instead.
+- **`query_departments` range** accepts only `today/7d/month/custom` — anything else (e.g. "14d") is **silently degraded**; always use `range:"custom"+from/to` for arbitrary windows and check the echoed `range.from`. Its `wowGrowthPercent` can be null — compute WoW from `previousTokens` yourself, and note the 7d window is 8-calendar-days vs prior 7 (asymmetric).
 
 ## 6. Output Template (department usage comparison questions)
 
@@ -250,7 +258,7 @@ A monthly/period aggregate can read **+X% (up)** while a department is actually 
 
 From the engine digest, write: **root cause**, **推测** (always mark inferences as 推测), **建议**, and the narrative. Rule out false declines (Section 4/7.3: roster rotation / departure / quota / model retirement / holidays) and label causes. **Never re-derive trends, %, deltas, slopes, or the growth/decline split** — those are the engine's, and they must stay reproducible.
 
-### 8.6 Structured output (keep these Chinese labels)
+### 8.6 Structured output (keep these Chinese labels — this template is a HARD skeleton: 「粒度声明」 and 「缺口」 lines are MANDATORY in every deep-analysis answer, and engine gaps must be carried through verbatim, not paraphrased away)
 
 ```
 结论:<部门> 本月工作日用量 <升/降 X%>,主因 <…>。口径:仅工作日、token 计、本月(引擎口径)。

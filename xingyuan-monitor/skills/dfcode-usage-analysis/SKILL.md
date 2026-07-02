@@ -1,6 +1,6 @@
 ---
 name: dfcode-usage-analysis
-description: Methodology for usage analysis via the DFCode enterprise MCP — department/employee token usage, period-over-period comparison, root-cause breakdown of "why did it rise/fall", and per-user usage-decline alerts answered at user granularity. When the user asks "部门用量" "谁用得多" "这几天为什么下降/上升" "对比两个周期", or (in a 飞书 group, @-mentioning the bot) asks "谁在掉量" "用户用量下降" "掉量预警/用量下降提醒", read this skill first.
+description: Methodology for usage analysis via the DFCode enterprise MCP — department/employee token usage, period-over-period comparison, same-time-window "today vs yesterday" intraday comparison, root-cause breakdown of "why did it rise/fall", and per-user usage-decline alerts answered at user granularity. When the user asks "部门用量" "谁用得多" "今天用量有没有上升/下降" "今天和昨天比" "这几天为什么下降/上升" "对比两个周期", or (in a 飞书 group, @-mentioning the bot) asks "谁在掉量" "用户用量下降" "掉量预警/用量下降提醒", read this skill first.
 ---
 
 # DFCode Usage Analysis Methodology
@@ -50,6 +50,23 @@ Before any comparison, **first ask: which variable am I holding fixed?** Only tw
 - Putting "period A's #1" side by side with "period B's #1" — they're often **different people** (object and time both changed), meaningless.
 - Comparing "a department's total" against "one person's usage" — **inconsistent granularity**.
 - Mixing scopes: token vs. request count, including vs. excluding non-staff (编外), different-length time windows.
+- **"Today's partial accumulation" vs "yesterday's FULL day"** — window length AND date both moved. This can even **flip the sign** of the conclusion (real incident: naive read −31.9% "明显下降" while the same-window truth was **+4.8% up**). See §3b — the same-window comparison is **your job, one call away; never hand "按同一时间点再复核" back to the user.**
+
+## 3b. Intraday Iron Rule: "today vs yesterday" MUST be same-time-window (你算,不是用户算)
+
+Whenever the comparison involves **the current, incomplete day** ("今天用量升了还是降了?" "今日 vs 昨日" — or any period whose right edge is today), the naive day-aggregate comparison is **forbidden as a conclusion**. Do the same-window comparison yourself:
+
+1. **ONE call gets everything**: `query_usage {from: <yesterday>, to: <today>, groupBy: "hour_day"}` → hour×date rows (2 days ≈ 30 rows / ~4KB, far under budget).
+2. **Pipe the rows into the engine — never hand-compute** (§8's rule applies here too):
+   ```bash
+   echo '{"items": <hour_day items>, "cutoff_hour": <current hour, e.g. 16>}' \
+     | python3 skills/dfcode-usage-analysis/scripts/usage_cube.py --intraday --md
+   ```
+   The engine returns: **same-window Δ%** (both days cut at `cutoff_hour`), baseline full day (reference), **projected full-day for today** (pace-based, labeled 推测), and the naive partial-vs-full % explicitly labeled 禁止口径. Omit `cutoff_hour` and it derives one from today's last active hour (deterministic).
+3. **Headline = the same-window number.** Yesterday's full day is context; the projection answers "那今天全天大概会怎样"; the naive number may appear **only** as "⚠️ 若按整日口径会误读为 −X%" — never as the conclusion.
+4. **Per-model / per-person drill-down (also same-window, ≤3 extra calls)**: for the top movers, `query_usage {model: <m>, from, to, groupBy: "hour_day"}` (or `userId: <id>`), tag rows with `"model"`, feed the combined items to the same `--intraday` run → the digest lists per-series same-window deltas. Identify *candidate* movers from a cheap day-aggregate first, but **verify and report them same-window**.
+5. **Baseline sanity** (engine flags these in `gaps`): if yesterday was a weekend/holiday and the question is about workday pace, use the previous workday or same weekday last week as `baseline`; a Monday-vs-Sunday comparison is another dirty comparison.
+6. If hourly data is unavailable for the range (tool error/empty), fall back to declaring the limitation **and still give the pace-based estimate** (today ÷ elapsed-fraction) labeled as rough — but never present partial-vs-full as the finding.
 
 **To see "people over time"**, **take the union of the two periods' populations and list, per person**, `token(A) → token(B) → Δ` (object fixed = each person; the only variable that moves is time). Use `query_departments`'s daily trends / WoW growth / top employees per dept.
 
@@ -72,7 +89,8 @@ When a department's usage changes, answer along this chain:
 | Single-person deep dive (overview, daily trend, model distribution, detail) | `query_employee_detail` / `query_department_employee_detail` |
 | Department assignment / non-staff (编外) determination / filter by status | `query_roster` |
 | Global overview (today/7d/month, active headcount, model distribution) | `query_dashboard` |
-| Cross-dimension aggregation | `query_usage` |
+| Cross-dimension aggregation | `query_usage` (`groupBy`: model/project/user/day/**hour**/agent + crosses `user_model`/`model_day`/`user_day`/**`hour_day`**/`model_hour`; filters: `from`/`to`/`userId`/`model`/`project`) |
+| **Same-window "today vs yesterday" (§3b)** | `query_usage {from,to, groupBy:"hour_day"}` → pipe to `usage_cube.py --intraday`; drill a mover with `model:`/`userId:` filter + same groupBy |
 
 ## 6. Output Template (department usage comparison questions)
 
@@ -193,6 +211,8 @@ The engine returns (and the `--md` digest summarizes): `scope`, `dept_daily`, `d
 ### 8.4 Recent-days questions ("最近两天用量下来了")
 
 Set `recent_days` to the window in question (e.g. `2`) and read `recent_days_view`: it compares the **last N workdays vs the preceding N workdays** (`dept_recent_vs_prior_pct`) and lists `per_person_drops` (prior_avg → recent_avg, drop_pct, last_active_date). This directly answers "谁最近掉量了". No in-context math.
+
+> ⚠️ **If the range's right edge is TODAY (an incomplete day), exclude today from the day-granularity cube** — a partial day pollutes every daily/weekly view as a fake drop. Answer the "today" part separately via §3b's same-window intraday comparison, and say so in the 口径 line.
 
 ### 8.4b Department "用量降低了" (incl. mid/partial week) → read `week_over_week`, NOT just the month aggregate
 

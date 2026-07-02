@@ -1067,6 +1067,47 @@ def _selftest() -> int:
     except Exception as exc:  # pragma: no cover
         check("md_no_throw", False, f"render_markdown threw {exc!r}")
 
+    # ---- intraday (same-time-window) mode ----
+    # Baseline day (Wed 6/10): 100 tokens/hour for hours 0..19  (window@16 = 1600, full = 2000)
+    # Today (Thu 6/11):        110 tokens/hour for hours 0..15  (window@16 = 1760)
+    # same-window: 1600 -> 1760 = +10.0%
+    # naive partial-vs-full: 2000 -> 1760 = -12.0%  (sign flip vs +10% — the whole point)
+    # projection: 1760 * 2000/1600 = 2200 -> +10.0% vs baseline full
+    intraday_items = (
+        [{"hour": f"{h:02d}:00", "date": "2026-06-10", "totalTokens": 100, "requests": 2} for h in range(20)]
+        + [{"hour": h, "date": "2026-06-11", "totalTokens": 110, "requests": 2, "model": "gpt-x"} for h in range(16)]
+    )
+    intr = build_intraday_result({"items": intraday_items, "cutoff_hour": 16})
+    o = intr["overall"]
+    check("intr_dates", intr["today"] == "2026-06-11" and intr["baseline"] == "2026-06-10",
+          f"got {intr['today']} / {intr['baseline']}")
+    check("intr_window", o["baseline_window"]["tokens"] == 1600.0 and o["today_window"]["tokens"] == 1760.0,
+          f"got {o['baseline_window']['tokens']} -> {o['today_window']['tokens']}")
+    check("intr_same_window", o["same_window_delta_pct"] == 10.0, f"got {o['same_window_delta_pct']}")
+    check("intr_naive_flips_sign", o["naive_partial_vs_full_pct"] == -12.0, f"got {o['naive_partial_vs_full_pct']}")
+    check("intr_projection", o["projected_today_full_tokens"] == 2200.0 and o["projected_vs_baseline_full_pct"] == 10.0,
+          f"got {o['projected_today_full_tokens']} / {o['projected_vs_baseline_full_pct']}")
+    # per-series: gpt-x rows only exist today -> baseline window 0 -> +100% capped rule
+    gptx = next((b for b in intr["per_series"] if b["series"] == "gpt-x"), None)
+    check("intr_series_present", gptx is not None, f"per_series={[b['series'] for b in intr['per_series']]}")
+    # derived cutoff (no cutoff_hour): today's last active hour is 15 -> cutoff 16, same numbers
+    intr2 = build_intraday_result({"items": intraday_items})
+    check("intr_derived_cutoff", intr2["cutoff_hour"] == 16, f"got {intr2['cutoff_hour']}")
+    check("intr_derived_gap_note", any("cutoff_hour not provided" in g for g in intr2["gaps"]),
+          f"gaps={intr2['gaps']}")
+    # markdown must not throw and must carry the headline + forbidden labels
+    try:
+        imd = render_intraday_markdown(intr)
+        check("intr_md_headline", "同窗对比" in imd and "禁止口径" in imd, "intraday md missing key labels")
+    except Exception as exc:  # pragma: no cover
+        check("intr_md_no_throw", False, f"render_intraday_markdown threw {exc!r}")
+    # empty input must not throw
+    try:
+        empty_intr = build_intraday_result({})
+        check("intr_empty_gap", any("empty result" in g for g in empty_intr["gaps"]), f"gaps={empty_intr['gaps']}")
+    except Exception as exc:  # pragma: no cover
+        check("intr_empty_no_throw", False, f"threw {exc!r}")
+
     if failures:
         print("FAIL")
         for f in failures:
@@ -1080,6 +1121,172 @@ def _selftest() -> int:
 
 
 # ---------------------------------------------------------------------------
+# Intraday (same-time-window) comparison — "今天 vs 昨天" done RIGHT
+# ---------------------------------------------------------------------------
+# WHY: comparing "today's partial accumulation" against "yesterday's FULL day"
+# is a dirty comparison (window length AND date both move) and can even flip
+# the sign of the conclusion (real incident 2026-07-02: naive said -31.9%
+# "明显下降", same-window said +4.8% — slightly UP). The agent must never hand
+# "按同一时间点再复核" back to the user; this mode computes it.
+#
+# STDIN (with --intraday):
+#   {
+#     "items": [   # raw rows from dfcode `query_usage groupBy=hour_day`
+#                  # (or per-model rows from two `groupBy=model_hour` calls,
+#                  #  each row then tagged with its "date")
+#       {"hour": "16:00"|16, "date": "YYYY-MM-DD",
+#        "totalTokens": n, "requests": n, "model": "optional"},
+#       ...
+#     ],
+#     "today":        "YYYY-MM-DD",  # optional; default = max date in items
+#     "baseline":     "YYYY-MM-DD",  # optional; default = latest date < today
+#     "cutoff_hour":  16             # optional; window = hours [0, cutoff).
+#                                    # default = (today's last active hour)+1,
+#                                    # derived from DATA (deterministic, no wall clock)
+#   }
+#
+# OUTPUT: same_window_delta_pct is THE headline number.
+# naive_partial_vs_full_pct is included ONLY to name the forbidden comparison.
+
+
+def _parse_hour(value: Any) -> int | None:
+    """Accept 16, "16", "16:00", "07:00" -> 16/7; else None (never raises)."""
+    s = _str(value).strip()
+    if not s:
+        return None
+    s = s.split(":")[0]
+    try:
+        h = int(s)
+    except ValueError:
+        return None
+    return h if 0 <= h <= 23 else None
+
+
+def _intraday_window(series: dict[int, tuple[float, float]], upto: int) -> dict[str, float]:
+    tokens = sum(t for h, (t, _r) in series.items() if h < upto)
+    requests = sum(r for h, (_t, r) in series.items() if h < upto)
+    return {"tokens": round(tokens, 2), "requests": round(requests, 2)}
+
+
+def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
+    """Same-time-window today-vs-baseline comparison from hourly rows."""
+    gaps: list[str] = []
+    raw_items = payload.get("items")
+    if not isinstance(raw_items, list):
+        raw_items = []
+        gaps.append("no items[] provided → empty result")
+
+    # cube: series -> date -> hour -> (tokens, requests). "总量" always maintained.
+    cube: dict[str, dict[str, dict[int, tuple[float, float]]]] = {}
+    malformed = 0
+    for it in raw_items:
+        if not isinstance(it, dict):
+            malformed += 1
+            continue
+        d = _parse_date(_str(it.get("date")))
+        h = _parse_hour(it.get("hour"))
+        if d is None or h is None:
+            malformed += 1
+            continue
+        tokens = _num(it.get("totalTokens", it.get("tokens")))
+        requests = _num(it.get("requests", it.get("totalRequests")))
+        series_names = ["总量"]
+        model = _str(it.get("model") or it.get("series")).strip()
+        if model:
+            series_names.append(model)
+        for name in series_names:
+            day = cube.setdefault(name, {}).setdefault(d.isoformat(), {})
+            t0, r0 = day.get(h, (0.0, 0.0))
+            day[h] = (t0 + tokens, r0 + requests)
+    if malformed:
+        gaps.append(f"{malformed} malformed item(s) skipped (bad date/hour)")
+
+    total = cube.get("总量", {})
+    dates = sorted(total)
+    today = _str(payload.get("today")) or (dates[-1] if dates else "")
+    baseline = _str(payload.get("baseline") or payload.get("yesterday"))
+    if not baseline:
+        prior = [d for d in dates if d < today]
+        baseline = prior[-1] if prior else ""
+    if not today or not baseline:
+        gaps.append("cannot determine today/baseline dates from items → empty result")
+
+    cutoff_raw = payload.get("cutoff_hour")
+    if cutoff_raw is None:
+        hours_today = [h for h, (t, r) in total.get(today, {}).items() if t > 0 or r > 0]
+        cutoff = (max(hours_today) + 1) if hours_today else 24
+        gaps.append(f"cutoff_hour not provided → derived from data as {cutoff:02d}:00 (today's last active hour + 1); pass cutoff_hour explicitly for a wall-clock cut")
+    else:
+        cutoff = max(0, min(24, int(_num(cutoff_raw))))
+
+    td, bd = _parse_date(today), _parse_date(baseline)
+    if bd is not None and bd.weekday() >= 5:
+        gaps.append(f"baseline {baseline} 是周末——工作日问题建议改用上一个工作日或上周同星期几作基线")
+    if td is not None and bd is not None and (td - bd).days != 1:
+        gaps.append(f"baseline 与 today 相差 {(td - bd).days} 天(非昨天)——确认这是有意选择的基线")
+
+    def series_block(series: dict[str, dict[int, tuple[float, float]]]) -> dict[str, Any]:
+        tw = _intraday_window(series.get(today, {}), cutoff)
+        bw = _intraday_window(series.get(baseline, {}), cutoff)
+        bf = _intraday_window(series.get(baseline, {}), 24)
+        tf = _intraday_window(series.get(today, {}), 24)
+        projected = round(tw["tokens"] * bf["tokens"] / bw["tokens"], 2) if bw["tokens"] > 0 else None
+        return {
+            "today_window": tw,
+            "baseline_window": bw,
+            "same_window_delta_pct": _pct_change(bw["tokens"], tw["tokens"]),
+            "same_window_requests_delta_pct": _pct_change(bw["requests"], tw["requests"]),
+            "baseline_full_day": bf,
+            "naive_partial_vs_full_pct": _pct_change(bf["tokens"], tf["tokens"]),
+            "projected_today_full_tokens": projected,
+            "projected_vs_baseline_full_pct": _pct_change(bf["tokens"], projected) if projected is not None else None,
+        }
+
+    overall = series_block(total)
+    per_series: list[dict[str, Any]] = []
+    for name in sorted(cube):
+        if name == "总量":
+            continue
+        block = series_block(cube[name])
+        block["series"] = name
+        block["window_delta_tokens"] = round(block["today_window"]["tokens"] - block["baseline_window"]["tokens"], 2)
+        per_series.append(block)
+    per_series.sort(key=lambda b: (-abs(b["window_delta_tokens"]), b["series"]))
+
+    return {
+        "mode": "intraday",
+        "today": today,
+        "baseline": baseline,
+        "cutoff_hour": cutoff,
+        "window_desc": f"两天均取 00:00–{cutoff:02d}:00 累计(同窗)",
+        "overall": overall,
+        "per_series": per_series,
+        "gaps": gaps,
+    }
+
+
+def render_intraday_markdown(result: dict[str, Any]) -> str:
+    o = result["overall"]
+    cutoff = result["cutoff_hour"]
+    lines = [
+        f"## 当日同窗对比 · {result['today']} vs {result['baseline']}(均截至 {cutoff:02d}:00)",
+        "",
+        f"- **同窗对比(结论用这个)**: {o['baseline_window']['tokens']:,.0f} → {o['today_window']['tokens']:,.0f} tokens,**Δ {o['same_window_delta_pct']:+.1f}%**;请求 Δ {o['same_window_requests_delta_pct']:+.1f}%",
+        f"- 参考·基线日整日: {o['baseline_full_day']['tokens']:,.0f} tokens",
+    ]
+    if o.get("projected_today_full_tokens") is not None:
+        lines.append(f"- 参考·按今日节奏折算全日(推测): ≈{o['projected_today_full_tokens']:,.0f} tokens,较基线日整日 {o['projected_vs_baseline_full_pct']:+.1f}%")
+    lines.append(f"- ⚠️ 禁止口径·今日累计 vs 基线日整日: {o['naive_partial_vs_full_pct']:+.1f}%(时间窗不等长,不得作结论)")
+    if result["per_series"]:
+        lines += ["", "### 分序列同窗变化(按 |Δtokens| 排序)"]
+        for b in result["per_series"][:10]:
+            lines.append(f"- {b['series']}: {b['baseline_window']['tokens']:,.0f} → {b['today_window']['tokens']:,.0f}(Δ {b['same_window_delta_pct']:+.1f}%,{b['window_delta_tokens']:+,.0f} tokens)")
+    if result["gaps"]:
+        lines += ["", "缺口: " + "; ".join(result["gaps"])]
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -1089,6 +1296,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--md", action="store_true",
                         help="emit a compact markdown digest instead of JSON")
+    parser.add_argument("--intraday", action="store_true",
+                        help="same-time-window today-vs-baseline comparison from hourly rows (query_usage groupBy=hour_day)")
     parser.add_argument("--selftest", action="store_true",
                         help="run the built-in synthetic dataset, assert numbers, print PASS/FAIL")
     args = parser.parse_args(argv)
@@ -1102,6 +1311,11 @@ def main(argv: list[str] | None = None) -> int:
     except json.JSONDecodeError as exc:
         # never throw; emit a valid empty result with a gap note
         payload = {}
+        if args.intraday:
+            result = build_intraday_result(payload)
+            result["gaps"].insert(0, f"STDIN was not valid JSON ({exc}) → empty result")
+            print(render_intraday_markdown(result) if args.md else json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
         result = build_result(payload)
         result["gaps"].insert(0, f"STDIN was not valid JSON ({exc}) → empty result")
         if args.md:
@@ -1112,6 +1326,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if not isinstance(payload, dict):
         payload = {}
+
+    if args.intraday:
+        result = build_intraday_result(payload)
+        print(render_intraday_markdown(result) if args.md else json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
 
     result = build_result(payload)
     if args.md:

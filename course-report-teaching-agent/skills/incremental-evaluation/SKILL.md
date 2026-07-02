@@ -58,7 +58,7 @@ Based on the increment table + radar chart, produce:
 In addition to "初稿 vs 终稿," you can add a third series 「AI独立解法」 — have the agent independently produce a version of the same topic and compare it against the "student + AI final draft." If the student's final draft **exceeds** the AI's independent solution on some dimensions, that is strong evidence of genuine student understanding. Usage: just add one more entry `"AI独立解法": [...]` to `series`, and the script will draw it into the radar chart as well.
 
 ## Example
-Under `examples/` there is a synthetic sample (topic + first draft + final draft + sample-scores.json), which you can run directly:
+Under `examples/` there is a synthetic sample (topic + first draft + final draft + sample-scores.json), which you can run directly. ⚠️ The `examples/*.json` score files are **rendering demos, not scoring gold standards** — when you actually score a report, derive every number from `rubric.md` (its band anchors and hard-deduction checks), never by imitating the demo numbers:
 ```bash
 python3 scripts/render_eval.py --scores examples/sample-scores.json --title "示例:城市共享单车调度课程报告"
 ```

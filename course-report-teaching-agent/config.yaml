@@ -1,11 +1,12 @@
 name: course-report-teaching-agent
 bundle_version: 2
-content_revision: 7
+content_revision: 8
 description: 面向课程报告场景的教学助手，支持探索选题、材料导读、报告撰写、文稿修订、六维评价、初终稿增量分析和教学反思。
 type: agentic
 dashboard: full
 workspace_type: workbench
 access: org
+model: deepseek-v4-pro  # 与学生端一致;评分/核查需要强模型,不随全局默认漂移
 thinking_enabled: true
 reasoning_effort: medium
 # 评审端要能读草稿、写评分 JSON、跑 incremental-evaluation skill 的 python（画雷达图）。

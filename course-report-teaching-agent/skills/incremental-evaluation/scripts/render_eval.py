@@ -41,36 +41,68 @@ def _load(path: str) -> dict:
         return json.load(f)
 
 
+def _is_ai_series(name: str) -> bool:
+    return "AI" in name.upper() or "基线" in name
+
+
+def _pick_pair(names: list[str]) -> tuple[str, str]:
+    """The increment Δ is the STUDENT's growth: 终稿 − 初稿.
+
+    Never let an AI-baseline series (conventionally last in the JSON) be picked
+    as the "final" side — that silently turns the headline increment into
+    AI基线−初稿 (real bug: 58→76 printed Δ+12 because the AI series at 70 sat
+    last). Prefer explicit 初稿/终稿 names, else the first/last NON-AI series.
+    """
+    base = next((n for n in names if "初稿" in n), None)
+    final = next((n for n in names if "终稿" in n), None)
+    if base is None or final is None:
+        non_ai = [n for n in names if not _is_ai_series(n)] or names
+        base = base or non_ai[0]
+        final = final or non_ai[-1]
+    return base, final
+
+
 def _print_increment_table(dims: list[str], series: dict[str, list[float]], evidence: dict[str, str]) -> None:
     names = list(series.keys())
-    has_pair = len(names) >= 2
-    base_name, final_name = (names[0], names[-1]) if has_pair else (names[0], names[0])
+    # The student increment Δ needs TWO student drafts. A single draft plus an
+    # AI baseline is a comparison (vs-AI column), not an increment — rendering
+    # Δ(终稿−终稿)=0 would be a fake column.
+    non_ai_names = [n for n in names if not _is_ai_series(n)]
+    has_pair = len(non_ai_names) >= 2
+    base_name, final_name = _pick_pair(names) if has_pair else (names[0], names[0])
     base, final = series[base_name], series[final_name]
+    ai_name = next((n for n in names if _is_ai_series(n)), None)
+    ai = series[ai_name] if ai_name else None
 
     print("\n### 六维增量评价")
     header = "| 维度 | " + " | ".join(names)
+    extra_headers = []
     if has_pair:
-        header += " | 增量(Δ) |"
-    else:
-        header += " |"
+        extra_headers.append(f"增量Δ({final_name}−{base_name})")
+    if ai is not None:
+        extra_headers.append(f"vs {ai_name}({final_name}−{ai_name})")
+    header += "".join(f" | {h}" for h in extra_headers) + " |"
     print(header)
-    print("|" + "---|" * (len(names) + (2 if has_pair else 1)))
+    print("|" + "---|" * (len(names) + 1 + len(extra_headers)))
+
+    def _fmt_signed(v: float) -> str:
+        text = f"{v:.1f}".rstrip("0").rstrip(".") if isinstance(v, float) else str(v)
+        return f"+{text}" if v >= 0 else text
+
     for i, dim in enumerate(dims):
-        row = f"| {dim} | " + " | ".join(str(series[n][i]) for n in names)
+        cells = [str(series[n][i]) for n in names]
         if has_pair:
-            delta = final[i] - base[i]
-            row += f" | {'+' if delta >= 0 else ''}{delta} |"
-        else:
-            row += " |"
-        print(row)
+            cells.append(_fmt_signed(final[i] - base[i]))
+        if ai is not None:
+            cells.append(_fmt_signed(final[i] - ai[i]))
+        print(f"| {dim} | " + " | ".join(cells) + " |")
     # totals
-    total_row = "| **合计/均值** | " + " | ".join(f"{sum(series[n]) / len(dims):.1f}" for n in names)
+    cells = [f"{sum(series[n]) / len(dims):.1f}" for n in names]
     if has_pair:
-        total_delta = (sum(final) - sum(base)) / len(dims)
-        total_row += f" | {'+' if total_delta >= 0 else ''}{total_delta:.1f} |"
-    else:
-        total_row += " |"
-    print(total_row)
+        cells.append(_fmt_signed(round((sum(final) - sum(base)) / len(dims), 1)))
+    if ai is not None:
+        cells.append(_fmt_signed(round((sum(final) - sum(ai)) / len(dims), 1)))
+    print("| **合计/均值** | " + " | ".join(cells) + " |")
 
     if evidence:
         print("\n**逐维依据**")
@@ -94,15 +126,71 @@ def _pick_cjk_font():
     return None
 
 
+def _xml_esc(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _render_radar_svg(dims: list[str], series: dict[str, list[float]], title: str, out_path: str) -> str:
+    """Zero-dependency SVG radar — fallback when matplotlib is absent.
+
+    SVG text uses the VIEWER's fonts, so CJK labels render in any browser /
+    IM preview without font probing; works on a bare customer machine."""
+    import math
+    width = height = 640
+    cx, cy, radius = width / 2, height / 2 + 14, 198.0
+    n = len(dims)
+    colors = ["#64748B", "#2563EB", "#F59E0B", "#10B981", "#EF4444"]
+
+    def pt(i: int, r: float) -> tuple[float, float]:
+        ang = -math.pi / 2 + 2 * math.pi * i / n
+        return (cx + r * math.cos(ang), cy + r * math.sin(ang))
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height + 44}" viewBox="0 0 {width} {height + 44}" font-family="PingFang SC, Microsoft YaHei, Noto Sans CJK SC, sans-serif">',
+        '<rect width="100%" height="100%" fill="white"/>',
+        f'<text x="{cx}" y="34" text-anchor="middle" font-size="18" fill="#0F172A">{_xml_esc(title)}</text>',
+    ]
+    for frac in (0.2, 0.4, 0.6, 0.8, 1.0):
+        ring = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, radius * frac) for i in range(n)))
+        parts.append(f'<polygon points="{ring}" fill="none" stroke="#E2E8F0" stroke-width="1"/>')
+        parts.append(f'<text x="{cx + 4:.1f}" y="{cy - radius * frac - 3:.1f}" font-size="9" fill="#94A3B8">{int(frac * 100)}</text>')
+    for i, dim in enumerate(dims):
+        ax, ay = pt(i, radius)
+        parts.append(f'<line x1="{cx}" y1="{cy}" x2="{ax:.1f}" y2="{ay:.1f}" stroke="#E2E8F0" stroke-width="1"/>')
+        lx, ly = pt(i, radius + 26)
+        anchor = "middle" if abs(lx - cx) < 30 else ("start" if lx > cx else "end")
+        parts.append(f'<text x="{lx:.1f}" y="{ly + 4:.1f}" text-anchor="{anchor}" font-size="13" fill="#334155">{_xml_esc(dim)}</text>')
+    for k, (name, values) in enumerate(series.items()):
+        color = colors[k % len(colors)]
+        pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (pt(i, radius * max(0.0, min(100.0, float(v))) / 100.0) for i, v in enumerate(values)))
+        dash = ' stroke-dasharray="6,4"' if "AI" in name else ""
+        parts.append(f'<polygon points="{pts}" fill="{color}" fill-opacity="0.10" stroke="{color}" stroke-width="2"{dash}/>')
+    for k, name in enumerate(series):
+        color = colors[k % len(colors)]
+        x, y = 24 + k * 180, height + 22
+        parts.append(f'<rect x="{x}" y="{y - 10}" width="12" height="12" fill="{color}" fill-opacity="0.6"/>')
+        parts.append(f'<text x="{x + 18}" y="{y}" font-size="12" fill="#334155">{_xml_esc(name)}</text>')
+    parts.append("</svg>")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(parts))
+    return out_path
+
+
 def _render_radar(dims: list[str], series: dict[str, list[float]], title: str, out_path: str) -> str | None:
     try:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
-    except Exception as exc:  # matplotlib not installed → degrade
-        print(f"\n(雷达图已跳过：{exc};增量表如上,可 `pip install matplotlib` 后重渲染)")
-        return None
+    except Exception as exc:  # matplotlib not installed → zero-dependency SVG fallback
+        svg_path = os.path.splitext(out_path)[0] + ".svg"
+        try:
+            saved = _render_radar_svg(dims, series, title, svg_path)
+            print(f"\n(matplotlib 不可用:{exc};已用内置 SVG 渲染雷达图,浏览器/预览可直接打开)")
+            return saved
+        except Exception as svg_exc:
+            print(f"\n(雷达图已跳过:matplotlib 不可用且 SVG 兜底失败 {svg_exc};增量表如上)")
+            return None
 
     cjk = _pick_cjk_font()
     if cjk:

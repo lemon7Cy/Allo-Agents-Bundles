@@ -38,8 +38,10 @@ curl -sS -X POST "http://221.0.79.251:18091/api/search" \
 - **`dataset` (which 明学 library to verify against — pick by the check; optional):**
   - `论文` (**default** if omitted) — verify the student's **citations** against real research papers. This is the primary channel for citation verification.
   - `教材` — the course textbook (《储能系统检测技术》): check a claim/concept against **authoritative course content** (for 选题 support and concept correctness), and cite "教材第 X 章" instead of only papers.
-  - `数据` — real experiment/OCV/test data, to corroborate the **数据分析** evaluation dimension against actual data.
-  - Omit `dataset` → papers. NOTE: `include_assets` (figures/tables) and `reference_signals` exist **only for the paper library**; for `教材/课件/数据` they come back empty — expected, use the body `chunks`.
+  - `课件` — course slides (per-chapter PPT), to check how the course itself presented a topic.
+  - `数据` — experiment/OCV/test data. ⚠️ Currently NOT retrievable (returns 0 chunks — known gap); for the **数据分析** dimension, corroborate against the raw data files / the student's code instead of this library.
+  - Omit `dataset` → papers. NOTE: `include_assets` (figures/tables) exists **only for the paper library** — other libraries return empty `assets`. `reference_signals` are **authoritative from the paper library only**; 教材/课件 can occasionally return non-empty signals (paper PDFs mixed into those libraries) — do NOT use them for citation verification.
+  - **Similarity sanity check**: `sim < 0.35` hits are weak / likely-irrelevant — treat them as 「库里查不到」 rather than as evidence.
 - The teacher is the evaluation authority and **may produce reviews/syntheses based on the search results** (not bound by the "ghostwriting" restriction). If the server has an LLM configured, use `/api/ask` for lesson preparation.
 
 ## Citation Verification Workflow (evidence-gathering means for the "文献引用" evaluation dimension)

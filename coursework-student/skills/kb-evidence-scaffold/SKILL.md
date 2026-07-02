@@ -41,8 +41,10 @@ curl -sS -X POST "http://221.0.79.251:18091/api/search" \
 - **`dataset` (which 明学 library to search — pick by the student's intent; optional):**
   - `教材` — the course textbook (《储能系统检测技术》): authoritative definitions, chapter concepts. Use it when the student needs to understand a concept or find "which chapter/section to read"; point them to the exact chapter.
   - `论文` (**default** if omitted) — research papers: methods, results, related work — the evidence layer.
-  - `数据` — real experiment / OCV / test data, for a data-analysis section.
-  - Omit `dataset` → papers, same as before. NOTE: `include_assets` (figures/tables) exists **only for the paper library**; for `教材/课件/数据` the `assets` list comes back empty — that's expected, use the body `chunks`.
+  - `课件` — course slides (per-chapter PPT): how the course itself frames a topic; use for classroom-material evidence.
+  - `数据` — experiment/OCV/test data. ⚠️ Currently NOT retrievable (returns 0 chunks — known infrastructure gap). For data-analysis needs, guide the student to run code on the raw data files instead; don't keep querying this library.
+  - Omit `dataset` → papers, same as before. NOTE: `include_assets` (figures/tables) exists **only for the paper library**; for `教材/课件/数据` the `assets` list comes back empty — that's expected, use the body `chunks`. `reference_signals` come back in both `answer` and `research` modes for the paper library (research is richer); other libraries may occasionally return non-empty signals when paper PDFs are mixed in — ignore those for citation purposes.
+- **Similarity sanity check**: chunks with `sim < 0.35` are weak / likely-irrelevant hits — do NOT present them as evidence. Say the library has no direct match, mark the gap, and suggest a sharper re-query or an external database.
 - **Use `/api/search` only. Never use `/api/ask`** — ask spits out a full prose answer, which equals ghostwriting and violates the scaffolding principle.
 
 ## Query planning (don't pile up jargon)

@@ -1130,6 +1130,19 @@ def _selftest() -> int:
     check("iu_dept_y", by_dept["Y"]["delta_vs_expected_pct"] == 350.0, f"got {by_dept['Y']}")
     check("iu_dept_order", iu["departments"][0]["department"] == "X", "drops should sort first")
     check("iu_estimate_gap", any("估算" in g for g in iu["gaps"]), f"gaps={iu['gaps']}")
+    # users_are_windowed=True: baseline IS the window → no pace scaling.
+    # 甲 window baseline 500 -> today 200 = -60% drop; 乙 200 -> 600 = +200%.
+    iw = build_intraday_result({"items": iu_items, "cutoff_hour": 5, "users_are_windowed": True, "users": [
+        {"name": "甲", "department": "X", "baseline_tokens": 500, "today_tokens": 200},
+        {"name": "乙", "department": "Y", "baseline_tokens": 200, "today_tokens": 600},
+    ]})
+    iwu = {u["name"]: u for u in iw["users"]}
+    check("iw_no_scaling", iwu["甲"]["expected_window_tokens"] == 500.0 and iwu["甲"]["delta_vs_expected_pct"] == -60.0,
+          f"got {iwu['甲']}")
+    check("iw_rise", iwu["乙"]["delta_vs_expected_pct"] == 200.0, f"got {iwu['乙']}")
+    check("iw_strict_gap", any("严格同窗" in g for g in iw["gaps"]) and not any("估算口径" in g for g in iw["gaps"]),
+          f"gaps={iw['gaps']}")
+    check("iw_md_caption", "严格同窗" in render_intraday_markdown(iw), "windowed md caption missing")
     try:
         iumd = render_intraday_markdown(iu)
         check("iu_md_sections", "分部门" in iumd and "明显下降" in iumd and "今日未使用" in iumd,
@@ -1301,11 +1314,17 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
     users_out: list[dict[str, Any]] = []
     departments_out: list[dict[str, Any]] = []
     raw_users = payload.get("users")
+    # users_are_windowed=True: baseline_tokens are ALREADY same-window figures
+    # (from query_usage hourTo=H per day) → strict comparison, no pace scaling.
+    # Otherwise baseline_tokens are FULL-DAY figures → scale by the org pace
+    # ratio into an expected-by-now estimate (fallback for older servers).
+    users_windowed = bool(payload.get("users_are_windowed"))
     if isinstance(raw_users, list) and raw_users:
-        if pace_ratio is None:
+        if pace_ratio is None and not users_windowed:
             gaps.append("baseline full-day tokens are 0 → cannot scale expected-by-now; per-user view skipped")
-        else:
-            dept_acc: dict[str, dict[str, float]] = {}
+            raw_users = []
+        dept_acc: dict[str, dict[str, float]] = {}
+        if raw_users:
             for u in raw_users:
                 if not isinstance(u, dict):
                     continue
@@ -1313,7 +1332,7 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
                 dept = _str(u.get("department")).strip() or "(未分组)"
                 base_full = _num(u.get("baseline_tokens", u.get("baseline_full_tokens")))
                 today_tokens = _num(u.get("today_tokens", u.get("tokens")))
-                expected = round(base_full * pace_ratio, 2)
+                expected = round(base_full, 2) if users_windowed else round(base_full * pace_ratio, 2)
                 if base_full <= SILENT_EPSILON and today_tokens > SILENT_EPSILON:
                     klass = "new"
                     delta = None
@@ -1342,7 +1361,7 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
                 acc["today"] += today_tokens
             for dept in sorted(dept_acc):
                 acc = dept_acc[dept]
-                d_expected = round(acc["baseline_full"] * pace_ratio, 2)
+                d_expected = round(acc["baseline_full"], 2) if users_windowed else round(acc["baseline_full"] * pace_ratio, 2)
                 departments_out.append({
                     "department": dept,
                     "baseline_full_tokens": round(acc["baseline_full"], 2),
@@ -1351,7 +1370,10 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
                     "delta_vs_expected_pct": _pct_change(d_expected, acc["today"]) if d_expected > SILENT_EPSILON else None,
                 })
             departments_out.sort(key=lambda d: (d["delta_vs_expected_pct"] if d["delta_vs_expected_pct"] is not None else 0.0, d["department"]))
-            gaps.append(f"分部门/个人为估算口径:昨日整日 × 全局进度比 {pace_ratio}(假设各人日内节奏相同),非严格同窗")
+            if users_windowed:
+                gaps.append("分部门/个人为严格同窗口径(query_usage hourTo 窗口聚合),与总量同窗一致")
+            else:
+                gaps.append(f"分部门/个人为估算口径:昨日整日 × 全局进度比 {pace_ratio}(假设各人日内节奏相同),非严格同窗;服务端已支持 hourTo 时请改用严格同窗")
 
     return {
         "mode": "intraday",
@@ -1360,6 +1382,7 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
         "cutoff_hour": cutoff,
         "window_desc": f"两天均取 00:00–{cutoff:02d}:00 累计(同窗)",
         "pace_ratio": pace_ratio,
+        "users_windowed": users_windowed,
         "overall": overall,
         "per_series": per_series,
         "departments": departments_out,
@@ -1389,7 +1412,8 @@ def render_intraday_markdown(result: dict[str, Any]) -> str:
         return f"{v:+.1f}%" if v is not None else "n/a"
 
     if result.get("departments"):
-        lines += ["", "### 分部门(昨日整日×进度比=到此刻期望 vs 今日实际,估算)"]
+        dept_caption = "严格同窗(hourTo 窗口聚合)" if result.get("users_windowed") else "昨日整日×进度比=到此刻期望 vs 今日实际,估算"
+        lines += ["", f"### 分部门({dept_caption})"]
         for d in result["departments"]:
             lines.append(f"- {d['department']}: 期望≈{d['expected_window_tokens']:,.0f} vs 实际 {d['today_window_tokens']:,.0f}(Δ {_fmt_delta(d['delta_vs_expected_pct'])})")
     users = result.get("users") or []

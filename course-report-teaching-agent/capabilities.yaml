@@ -50,6 +50,12 @@ capabilities:
     required: false
     role: assessment
     description: 对比初稿和终稿，识别结构、证据、数据分析、引用、结论和反思的具体改进与剩余风险（随包 skill：skills/incremental-evaluation，雷达图）。
+  - id: report-presentation-review
+    type: skill
+    label: 讲解答辩视频评价
+    required: false
+    role: assessment
+    description: 处理学生的课程报告讲解/答辩录像，映射到口头可考察的六维（创新性/数据分析深度/结论合理性），并结合书面报告做“报告↔讲解一致性核验”，给出疑似代写/理解不足的真实性提示（随包 skill：skills/report-presentation-review，调用 Allo 视频理解服务）。
   - id: reflection-coach
     type: workflow_step
     label: 教学反思与成长建议
@@ -67,4 +73,5 @@ entry_prompts:
   - 请根据课程要求生成课程报告提纲，并标注每一节需要的证据和反思点。
   - 请按六维评分模型评审这份初稿，给出优先修改建议和待补充材料。
   - 请对比初稿和终稿，生成增量评价、成长证据链、风险提示和反思问题。
+  - 这是学生的报告讲解录像，请评价讲解并和书面报告做一致性核验，看是否本人真实理解。
   - 请帮我生成教师参考评语，并列出适合追问学生的 5 个问题。

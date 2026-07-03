@@ -57,6 +57,9 @@ Based on the increment table + radar chart, produce:
 ## Optional: AI baseline comparison (a stronger "do they really understand" test)
 In addition to "初稿 vs 终稿," you can add a third series 「AI独立解法」 — have the agent independently produce a version of the same topic and compare it against the "student + AI final draft." If the student's final draft **exceeds** the AI's independent solution on some dimensions, that is strong evidence of genuine student understanding. Usage: just add one more entry `"AI独立解法": [...]` to `series`, and the script will draw it into the radar chart as well.
 
+## Optional: presentation/defense video (the third authenticity signal)
+When a report presentation/defense recording is available, the `report-presentation-review` skill runs a **report↔oral consistency check**. Combine its `report_video_consistency` signal with this increment and the AI baseline to judge the student's **real level**: 增量扎实 + 终稿超 AI 基线 + 讲解与书面一致且能答 → 真实掌握;书面强但讲不出/讲解远薄于书面 → 疑似代写或理解不足(推测,建议答辩追问)。The video is an authenticity + corroboration layer, **not** a seventh rubric dimension — the six-dimension scores still come from `rubric.md`.
+
 ## Example
 Under `examples/` there is a synthetic sample (topic + first draft + final draft + sample-scores.json), which you can run directly. ⚠️ The `examples/*.json` score files are **rendering demos, not scoring gold standards** — when you actually score a report, derive every number from `rubric.md` (its band anchors and hard-deduction checks), never by imitating the demo numbers:
 ```bash

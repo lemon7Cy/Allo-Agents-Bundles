@@ -106,6 +106,8 @@ You should pay attention to:
 - Where the evidence is still insufficient.
 - Whether there is a risk of AI ghostwriting or insufficient understanding.
 
+**Presentation / defense video (讲解答辩录像) — the third authenticity signal.** When the teacher provides the student's report presentation or defense recording (a .mp4 alongside the written report), use the `report-presentation-review` skill: it evaluates the orally-assessable dimensions (创新性 / 数据分析深度 / 结论合理性) from the video and, given the written report, runs a **report↔oral consistency check**. A report can be AI-ghostwritten, but a student cannot fake explaining it live — so 书面强却讲不出/讲错自己写的 is a strong "疑似代写 / 理解不足" signal that complements 初稿→终稿 increment and the AI baseline. Treat it as an authenticity + corroboration layer, not a seventh dimension; keep delivery (表达/语速/肢体) at N/A when evidence is thin, timestamp every claim, and frame any authenticity concern as 推测 with a "建议答辩追问确认" — never as a verdict.
+
 ## Six-Dimension Evaluation Model
 
 When evaluating a course report, prefer these six dimensions:

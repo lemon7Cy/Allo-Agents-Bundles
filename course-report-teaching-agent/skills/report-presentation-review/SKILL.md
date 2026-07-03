@@ -1,6 +1,6 @@
 ---
 name: report-presentation-review
-description: Evaluate a student's course-report presentation / defense video (讲解/答辩录像) as part of teacher evaluation. Submit the local MP4 to the Allo video-understanding service, get ASR/OCR/timeline/summary evidence, then run the course-report evaluation — which maps the video to the orally-assessable 六维 and, given the written report, runs a report↔oral consistency check that surfaces suspected ghostwriting / shallow understanding. Read this skill when the teacher provides a report presentation/defense video (a .mp4 alongside the written report). Never fabricate; every claim carries a timestamp; delivery dimensions stay N/A when evidence is thin.
+description: Evaluate a student's course-report presentation / defense video (讲解/答辩录像) as part of teacher evaluation, and cross-check it against the written report. Read this skill WHENEVER the teacher gives a report讲解/答辩录像 — either as a local .mp4 to submit, OR as an already-processed video job_id — and asks to 评价讲解/答辩、看学生是不是真懂/是不是本人做的(疑似代写)、讲解和书面报告对不对得上/一致性核验. It maps the video to the orally-assessable 六维 (创新性/数据分析深度/结论合理性) and, given the written report, runs a report↔oral consistency check that surfaces suspected ghostwriting / shallow understanding. Never fabricate; every claim carries a timestamp; delivery dimensions stay N/A when evidence is thin.
 version: "1.0.0"
 author: allo-official
 required_env: []
@@ -33,11 +33,13 @@ So this skill's job is **not** a standalone "video score". It produces a **讲�
 ## Workflow (course-report defense)
 
 1. **Health check** (above). Stop on failure.
-2. **Submit the video and wait** (auto soft-budget, polls until done while healthy):
-   ```bash
-   bash scripts/media_understanding.sh analyze /absolute/path/to/讲解视频.mp4 auto
-   ```
-   Capture `job_id`. On a foreground timeout, resume: `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
+2. **Get a `job_id` — reuse before re-uploading.**
+   - **If the teacher already gives you a `job_id`** (the video was processed before), **do NOT upload anything** — the result is cached on the server. Skip straight to step 3 with that `job_id`. (Sanity check it exists: `bash scripts/media_understanding.sh job JOB_ID`.) Uploading is the slow part, so an existing `job_id` is always preferred.
+   - **Only if there is no `job_id`**, submit the local file and wait (auto soft-budget, polls until done while healthy):
+     ```bash
+     bash scripts/media_understanding.sh analyze /absolute/path/to/讲解视频.mp4 auto
+     ```
+     Capture `job_id`. On a foreground timeout, resume: `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
 3. **Run the course-report evaluation, passing the written report** (this is what enables the consistency check). Write the report body (the same text you evaluate in the six-dimension rubric) to a temp file, then:
    ```bash
    bash scripts/media_understanding.sh course-eval JOB_ID /absolute/path/to/report.txt

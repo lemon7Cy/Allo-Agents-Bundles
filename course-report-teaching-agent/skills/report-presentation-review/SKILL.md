@@ -4,8 +4,7 @@ description: Evaluate a student's course-report presentation / defense video (�
 version: "1.0.0"
 author: allo-official
 required_env: []
-optional_env:
-  - AV_UNDERSTANDING_BASE_URL
+optional_env: []
 ---
 
 # Course-Report Presentation / Defense Review (讲解答辩视频评价)

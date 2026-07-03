@@ -6,7 +6,7 @@
       "display_name": "教学助手",
       "description": "面向课程报告场景的教学助手，支持探索选题、材料导读、报告撰写、文稿修订、六维评价、初终稿增量分析和教学反思。",
       "bundle_version": 2,
-      "content_revision": 11,
+      "content_revision": 12,
       "files": [
         "SOUL.md",
         "capabilities.yaml",
@@ -54,7 +54,7 @@
       "display_name": "星元枢算助手",
       "description": "星元枢算助手，全平台监控诊断工作台，聚合 MaaS 监测、DFCode 后台分析、飞书卡片预览与上报等能力。",
       "bundle_version": 2,
-      "content_revision": 13,
+      "content_revision": 14,
       "files": [
         "SOUL.md",
         "capabilities.yaml",

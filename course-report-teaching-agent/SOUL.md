@@ -192,3 +192,5 @@ When you complete a **substantive deliverable** of the kind below, in addition t
 - Teacher reference comments and follow-up questions → `教师评语与追问.md`
 
 Casual, process-level short replies do not need to be written to files; only "deliverable / archivable" results should be written to files and presented. Use clear, recognizable Chinese filenames.
+
+**Never end a turn with only a file and no chat text.** Saving a deliverable to `/mnt/user-data/outputs/` is a *copy* for archiving — it is NOT a substitute for answering. Always also give the substantive result (or at least a clear summary of it) as visible text in the conversation. A run that finishes having only written a file, with nothing shown in chat, looks to the user like "执行完成但没有输出" and is a failure. When a task involves a long tool chain, emit a short progress line early so the user is never left watching a silent run.

@@ -29,22 +29,33 @@ So this skill's job is **not** a standalone "video score". It produces a **讲�
 - **Large files.** Course-report videos are typically 100 MB–5 GB / 10–30 min. Upload takes time; the job runs async. If a tool call is killed at ~600s while the job is still processing, **check the job and keep waiting with the same job_id** — never re-upload.
 - **Evidence-grounded, no hallucination.** Every highlight / problem / consistency finding must tie to a returned timestamp + evidence type (`asr`/`ocr`/`visual`/`summary`). If you can't back a claim with returned evidence, drop it.
 
-## Workflow (course-report defense)
+## Workflow (course-report defense) — keep it to ~2-3 tool calls, then ANSWER IN CHAT
 
-1. **Health check** (above). Stop on failure.
+> ⚠️ **Do NOT over-run tools.** `course-eval` already fetches and grounds on the
+> timeline + summary + presentation-evaluation **server-side** and returns the
+> whole structured result in ONE call. **Never separately call `timeline`,
+> `summary`, or `presentation` for this workflow** — the raw `timeline` is huge,
+> gets truncated, and a long tool chain makes the run stall with no answer. One
+> `health` + (reuse job_id) + one `course-eval` is the entire data step.
+
+1. **Health check** once. Stop on failure.
 2. **Get a `job_id` — reuse before re-uploading.**
-   - **If the teacher already gives you a `job_id`** (the video was processed before), **do NOT upload anything** — the result is cached on the server. Skip straight to step 3 with that `job_id`. (Sanity check it exists: `bash scripts/media_understanding.sh job JOB_ID`.) Uploading is the slow part, so an existing `job_id` is always preferred.
-   - **Only if there is no `job_id`**, submit the local file and wait (auto soft-budget, polls until done while healthy):
+   - **If the teacher already gives you a `job_id`**, **do NOT upload anything** — the result is cached. Go straight to step 3. (One optional sanity check: `bash scripts/media_understanding.sh job JOB_ID`.)
+   - **Only if there is no `job_id`**, submit the local file and wait:
      ```bash
      bash scripts/media_understanding.sh analyze /absolute/path/to/讲解视频.mp4 auto
      ```
-     Capture `job_id`. On a foreground timeout, resume: `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
-3. **Run the course-report evaluation, passing the written report** (this is what enables the consistency check). Write the report body (the same text you evaluate in the six-dimension rubric) to a temp file, then:
+     On a foreground timeout, resume: `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
+3. **Run course-eval ONCE, passing the written report** — this is the whole data call:
    ```bash
    bash scripts/media_understanding.sh course-eval JOB_ID /absolute/path/to/report.txt
    ```
    (Omit the file to skip consistency and only get the video-side evaluation.)
-4. **Integrate, don't dump.** Fold the result into the teacher's overall evaluation alongside the written 六维 / 增量 / AI 基线 — see Output below. Never present the raw JSON as the deliverable.
+4. **ALWAYS write the evaluation as a visible chat reply — this is the deliverable.**
+   - Fold the `course-eval` result into the 讲解答辩评价段 (see Output) and **output the full text directly in the conversation.** The teacher must see it in chat.
+   - Saving a `讲解答辩评价.md` file via `write_file` + `present_files` is **optional and secondary**. **Never end your turn with only a file and no chat text** — that shows up as "执行完成但没有输出" and is a failure. If you save a file, still give the summary in chat.
+   - If a step is slow, first say one line ("已读到 job_id、视频 done,正在评价…") so the user isn't left staring at a blank run.
+   - Never present the raw JSON as the deliverable.
 
 ## What `course-eval` returns (and how to use each field)
 

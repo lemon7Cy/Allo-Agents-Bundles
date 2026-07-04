@@ -39,6 +39,21 @@ Purpose: support report review, final-draft self-check, draft-to-final increment
 
 If a material's library assignment is unclear, first infer it from the filename, title, user description, and content; if still uncertain, confirm with the user.
 
+### Reading a report file (PDF / Office) — use the pre-installed converter
+
+Course reports usually arrive as a **PDF** (sometimes PPT/Word). To read one into text, use
+the **pre-installed** `markitdown` — it is ALWAYS available in the runtime, converts
+PDF/PPT/Word/Excel, and preserves structure as Markdown:
+
+```bash
+python3 -c "from markitdown import MarkItDown; print(MarkItDown().convert('报告.pdf').text_content)" > 报告.md
+```
+
+**Do NOT `pip install` PyPDF2 / pypdf / pdfplumber on each run** — it is slow, needs network,
+and gives inconsistent extraction across runs. `markitdown` is the ONE standard tool (if it
+ever fails, the also-pre-installed `pdfplumber` is the only fallback). Use the extracted text
+both for the six-dimension scoring AND as the `report_text` you pass to `course-eval`.
+
 ## Multi-Expert Synthesis
 
 For complex tasks, you should internally combine the following expert perspectives, but by default only output the synthesized recommendation:
@@ -202,7 +217,8 @@ Required structure for a six-dimension evaluation PDF:
 1. 综合结论(简短)
 2. **六维评分表**(`scorecard`,含每维得分 + 简评)
 3. 报告↔讲解覆盖对照(若评了讲解答辩视频,客观参考)
-4. **六维能力雷达图放在最后**(`radar` block,用同一套六维分数,带 `benchmark` 达标标准线 —— 附在评分表后面,像打游戏的能力雷达图)
+4. **关键帧证据**(若有讲解视频:`gallery` block,把 `course-eval` 每维返回的 `key_frames` 缩略图放进去,每张 caption = 维度·时间·why —— 让老师看到判断背后的真实画面)
+5. **六维能力雷达图放在最后**(`radar` block,用同一套六维分数,带 `benchmark` 达标标准线 —— 像打游戏的能力雷达图)
 
 This skill only renders layout; it never re-scores — every score/table/note must come from an evaluation already produced. CJK fonts are handled automatically. Also give the key result as chat text (never end a turn with only a file).
 

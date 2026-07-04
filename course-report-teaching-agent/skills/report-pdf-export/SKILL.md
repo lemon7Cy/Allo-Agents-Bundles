@@ -113,12 +113,34 @@ rendered PDF is user-facing.
 ```
 
 Block `type` values: `paragraph`, `bullets` (`items`), `table` (`columns` + `rows`),
-`scorecard` (`items` with `name`/`score`/`max`/`note`), `note` (a callout box), and
-`radar` (`dimensions` with `name`/`score`, optional `max` (default 100), `caption`, and
-`benchmark`). `**bold**` works inside paragraph/bullet/table/note text.
+`scorecard` (`items` with `name`/`score`/`max`/`note`), `note` (a callout box),
+`radar` (`dimensions` with `name`/`score`, optional `max` (default 100), `caption`,
+`benchmark`), `gallery` (`images` + optional `cols`), and `image` (single). `**bold**`
+works inside paragraph/bullet/table/note/caption text.
+
+**Include a `gallery` of the video key frames when the evaluation came from a defense
+video.** The video service's `course-eval` (via the `report-presentation-review` skill)
+saves each key frame as an image **file** and returns, per orally-assessable dimension, a
+`key_frames` list where each item has `timecode`, `why`, and a **`frame_path`** (an absolute
+path to the saved .jpg, under `/mnt/user-data/outputs/关键帧证据/`). Build a 「关键帧证据」
+section with a `gallery` block so the teacher SEES the frame behind each judgment:
+
+```json
+{"heading": "关键帧证据", "blocks": [
+  {"type": "gallery", "cols": 2, "images": [
+    {"data": "/mnt/user-data/outputs/关键帧证据/创新性_00-00_0.jpg", "caption": "**创新性** · 00:00 · 标题页展示研究主题"},
+    {"data": "/mnt/user-data/outputs/关键帧证据/数据分析深度_12-35_1.jpg", "caption": "**数据分析深度** · 12:35 · 多指标评价体系"}
+  ]}
+]}
+```
+
+Put each `key_frames[].frame_path` into `data` (a file path OR a base64 data-URL both work);
+build each `caption` from the dimension + `timecode` + `why`. `gallery` items are
+`{data, caption}`; frames that fail to load are skipped. (`image` is the single-image variant.)
 
 **Always include a `radar` block for a six-dimension evaluation, placed at the END**
-(after the scoring table), so the report reads 综合结论 → 六维评分表 → (覆盖对照) → 能力雷达图.
+(after the scoring table), so the report reads
+综合结论 → 六维评分表 → (报告↔讲解覆盖对照) → (关键帧证据 gallery,若有讲解视频) → 能力雷达图.
 This is the 能力雷达图量化评分 look. Use the same six scores you show in the `scorecard`.
 The radar is drawn as a crisp vector chart (no image files); it needs at least 3 dimensions.
 

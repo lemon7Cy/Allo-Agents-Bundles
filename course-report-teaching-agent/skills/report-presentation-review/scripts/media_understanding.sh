@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 BASE_URL="${AV_UNDERSTANDING_BASE_URL:-http://221.0.79.252:8090}"
 DEFAULT_POLL_INTERVAL="${AV_UNDERSTANDING_POLL_INTERVAL:-5}"
 # "forever" means: keep polling until the job is done/failed, as long as the
@@ -387,9 +389,14 @@ if path:
 print(json.dumps({"report_text": text, "refresh": os.environ.get("REFRESH") == "true"}, ensure_ascii=False))
 PY
 )"
+    # Pipe the response through save_key_frames.py (a SEPARATE file, NOT an inline
+    # `python3 - <<'PY'` heredoc — that makes the heredoc win stdin so the curl output
+    # never reaches the script). It saves each key-frame thumbnail to an image FILE under
+    # $ALLO_OUTPUTS_DIR and rewrites the JSON with a compact `frame_path` for the PDF gallery.
     curl -sS --connect-timeout 10 --max-time 240 -X POST "$BASE_URL/api/jobs/$job_id/course-report-evaluation" \
       -H 'Content-Type: application/json' \
-      -d "$payload"
+      -d "$payload" \
+      | python3 "$SELF_DIR/save_key_frames.py"
     ;;
   video-url)
     job_id="${2:-}"

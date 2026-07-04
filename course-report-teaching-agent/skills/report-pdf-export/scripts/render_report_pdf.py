@@ -50,6 +50,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import Image as RLImage
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 # Minimal ink palette so the report reads as tidy, not decorated.
@@ -293,8 +294,105 @@ def _radar_drawing(names: list[str], scores: list[float], maxv: float, font: str
     return d
 
 
+def _decode_image(data: str):
+    """Turn a base64 string or `data:image/...;base64,...` URL into a BytesIO."""
+    import base64
+    import io
+
+    raw = (data or "").strip()
+    if raw.startswith("data:"):
+        raw = raw.split(",", 1)[-1]
+    try:
+        return io.BytesIO(base64.b64decode(raw))
+    except Exception:
+        return None
+
+
+def _image_flowable(data: str, max_w: float, max_h: float):
+    """A reportlab Image scaled to fit within (max_w, max_h), preserving aspect.
+    `data` may be a file path, a base64 data-URL, or raw base64."""
+    import os as _os
+
+    raw = (data or "").strip()
+    if not raw:
+        return None
+    # A local file path (the key-frame images saved by course-eval) takes priority.
+    src = raw if (not raw.startswith("data:") and _os.path.exists(raw)) else _decode_image(raw)
+    if src is None:
+        return None
+    try:
+        from reportlab.lib.utils import ImageReader
+
+        iw, ih = ImageReader(src).getSize()
+        if hasattr(src, "seek"):
+            src.seek(0)
+        if iw <= 0 or ih <= 0:
+            return None
+        scale = min(max_w / iw, max_h / ih)
+        return RLImage(src, width=iw * scale, height=ih * scale)
+    except Exception:
+        return None
+
+
+def _gallery(images: list, st: dict, avail_width: float, cols: int = 2) -> list:
+    """A grid of key-frame thumbnails, each with a caption. `images` items are
+    {data|thumbnail, caption}. Skips any that fail to decode."""
+    cols = max(1, min(int(cols or 2), 3))
+    cell_w = avail_width / cols
+    cells: list = []
+    for item in images:
+        if not isinstance(item, dict):
+            continue
+        img = _image_flowable(item.get("data") or item.get("thumbnail") or "", cell_w - 12, 150)
+        if img is None:
+            continue
+        img.hAlign = "CENTER"
+        caption = Paragraph(_markup(item.get("caption", "")), st["caption"]) if item.get("caption") else Spacer(1, 0)
+        cells.append((img, caption))
+    if not cells:
+        return []
+    rows = [cells[i : i + cols] for i in range(0, len(cells), cols)]
+    for row in rows:
+        while len(row) < cols:
+            row.append(None)
+
+    def _cell(entry):
+        # Each grid cell is a 1-col, 2-row table so the image sits above its caption.
+        if entry is None:
+            return ""
+        img, caption = entry
+        return Table([[img], [caption]], colWidths=[cell_w - 8])
+
+    grid = [[_cell(entry) for entry in row] for row in rows]
+    table = Table(grid, colWidths=[cell_w] * cols, hAlign="LEFT")
+    table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    return [table, Spacer(1, 4)]
+
+
 def _render_block(block: dict, st: dict, avail_width: float) -> list:
     btype = block.get("type", "paragraph")
+    if btype == "gallery":
+        return _gallery(block.get("images", []), st, avail_width, block.get("cols", 2))
+    if btype == "image":
+        img = _image_flowable(block.get("data") or block.get("thumbnail") or "", avail_width * 0.6, 220)
+        if img is None:
+            return []
+        img.hAlign = "CENTER"
+        out: list = [img]
+        if block.get("caption"):
+            out.append(Paragraph(_markup(block["caption"]), st["caption"]))
+        out.append(Spacer(1, 6))
+        return out
     if btype == "paragraph":
         return [Paragraph(_markup(block.get("text", "")), st["body"])]
     if btype == "bullets":

@@ -39,20 +39,22 @@ Purpose: support report review, final-draft self-check, draft-to-final increment
 
 If a material's library assignment is unclear, first infer it from the filename, title, user description, and content; if still uncertain, confirm with the user.
 
-### Reading a report file (PDF / Office) — use the pre-installed converter
+### Reading a report file (PDF / Office) — pick a python that ALREADY has markitdown
 
-Course reports usually arrive as a **PDF** (sometimes PPT/Word). To read one into text, use
-the **pre-installed** `markitdown` — it is ALWAYS available in the runtime, converts
-PDF/PPT/Word/Excel, and preserves structure as Markdown:
+Course reports usually arrive as a **PDF** (sometimes PPT/Word). Convert it to text with
+`markitdown` — but FIRST pick an interpreter that already has it. The plain `python3` on the
+sandbox PATH usually does NOT have markitdown, but `/usr/bin/python3` and Allo's bundled
+python DO. So use this one-liner, which tries the interpreters that have it and only installs
+as a last resort — it must NOT `pip install` on every run:
 
 ```bash
-python3 -c "from markitdown import MarkItDown; print(MarkItDown().convert('报告.pdf').text_content)" > 报告.md
+PY=$(for p in /usr/bin/python3 python3; do "$p" -c 'import markitdown' 2>/dev/null && echo "$p" && break; done); [ -z "$PY" ] && python3 -m pip install -q markitdown && PY=python3; "$PY" -c "from markitdown import MarkItDown; print(MarkItDown().convert('报告.pdf').text_content)" > 报告.md
 ```
 
-**Do NOT `pip install` PyPDF2 / pypdf / pdfplumber on each run** — it is slow, needs network,
-and gives inconsistent extraction across runs. `markitdown` is the ONE standard tool (if it
-ever fails, the also-pre-installed `pdfplumber` is the only fallback). Use the extracted text
-both for the six-dimension scoring AND as the `report_text` you pass to `course-eval`.
+**Do NOT reach for PyPDF2 / pypdf / pdfplumber, and do NOT `pip install` anything before
+trying `/usr/bin/python3` first** — installing a converter on every run is slow and was the
+top user complaint. Use the extracted text both for the six-dimension scoring AND as the
+`report_text` you pass to `course-eval`.
 
 ## Multi-Expert Synthesis
 
@@ -217,7 +219,7 @@ Required structure for a six-dimension evaluation PDF:
 1. 综合结论(简短)
 2. **六维评分表**(`scorecard`,含每维得分 + 简评)
 3. 报告↔讲解覆盖对照(若评了讲解答辩视频,客观参考)
-4. **关键帧证据**(若有讲解视频:`gallery` block,把 `course-eval` 每维返回的 `key_frames` 缩略图放进去,每张 caption = 维度·时间·why —— 让老师看到判断背后的真实画面)
+4. **关键帧证据**(若有讲解视频:`course-eval` 已把每维关键帧存成图片、并生成一个**现成的区块文件** `$ALLO_OUTPUTS_DIR/关键帧证据/gallery_block.json`。**读它、把整个对象原样塞进 sections(放雷达之前)**——里面是所有关键帧的 gallery,每张 caption=维度·时间·why。**别自己只挑一张、别跳过**,让老师看到每个判断背后的真实画面)
 5. **六维能力雷达图放在最后**(`radar` block,用同一套六维分数,带 `benchmark` 达标标准线 —— 像打游戏的能力雷达图)
 
 This skill only renders layout; it never re-scores — every score/table/note must come from an evaluation already produced. CJK fonts are handled automatically. Also give the key result as chat text (never end a turn with only a file).

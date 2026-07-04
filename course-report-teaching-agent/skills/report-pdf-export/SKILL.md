@@ -1,6 +1,6 @@
 ---
 name: report-pdf-export
-description: Export a finished course-report evaluation as a tidy, print-ready PDF — one file per student. Read this skill WHENEVER the teacher, after an evaluation has been produced (六维评分 / 增量评价 / 讲解答辩一致性核验), asks for a 完整规整的报告、导出 PDF、"各自一份 PDF"、"pdf 吧"、可打印/可下发的评价报告. You build a small JSON from the evaluation you already produced and run the renderer; it lays out title, student meta, sections, score tables and consistency tables into a clean A4 PDF. Chinese fonts are handled automatically (embeds an OS CJK font, falls back to a built-in one). One student per call → one PDF per student. Do NOT invent scores or findings here — only render what the evaluation already established.
+description: Export a finished course-report evaluation as a tidy, print-ready PDF — one file per report. Read this skill WHENEVER the teacher, after an evaluation has been produced (六维评分 / 增量评价 / 讲解答辩一致性核验), asks for a 完整规整的报告、导出 PDF、"pdf 吧"、可打印/可下发的评价报告 (and by default whenever an evaluation deliverable is produced). You build a small JSON from the evaluation you already produced and run the renderer; it lays out title, meta, sections, score tables and the ability radar into a clean A4 PDF. Chinese fonts are handled automatically (embeds an OS CJK font, falls back to a built-in one). Write ONLY to /mnt/user-data/outputs/ and name the file after the report/课题 title (报告标题-课程报告评价.pdf), never after student names. Do NOT invent scores or findings here — only render what the evaluation already established.
 version: "1.0.0"
 author: allo-official
 required_env: []
@@ -11,17 +11,18 @@ optional_env: []
 
 ## Why this exists
 
-The agent already produces evaluations as Markdown/chat text. Teachers often need a
-**complete, tidy, printable PDF per student** to file, hand back, or attach. This skill
+The agent already produces evaluations as Markdown/chat text. Teachers need a
+**complete, tidy, printable PDF per report** to file, hand back, or attach. This skill
 is the render-only last mile: it turns an evaluation **you have already produced** into a
 professional A4 PDF. It does not score or judge — it only lays out existing findings.
 
 ## When to read this skill
 
-- The teacher says 导出 PDF / 生成 PDF / "pdf 吧" / 各自一份(报告)/ 完整规整一点的报告 / 可打印的评价报告.
-- After a 六维评分, 初终稿增量评价 ([[incremental-evaluation]]), or 讲解答辩一致性核验
-  ([[report-presentation-review]]) — when the teacher wants the result as a file.
-- Multiple students → call once per student → one PDF each.
+- Whenever you finish an evaluation deliverable (PDF is the standard output), or the
+  teacher says 导出 PDF / 生成 PDF / "pdf 吧" / 完整规整一点的报告 / 可打印的评价报告.
+- After a 六维评分, 初终稿增量评价 ([[incremental-evaluation]]), or 讲解答辩评价
+  ([[report-presentation-review]]).
+- One PDF per report → one render call → named after the report title.
 
 ## How to use
 
@@ -32,14 +33,19 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
    ```bash
    python3 /mnt/skills/.../report-pdf-export/scripts/render_report_pdf.py \
      --data report.json \
-     --out "/mnt/user-data/outputs/李思远-课程报告评价.pdf"
+     --out "/mnt/user-data/outputs/锂电池SOC-SOH联合估计报告-课程报告评价.pdf"
    ```
 
-   Use the student's name in the filename so each student's PDF is distinct.
-3. `present_files` the resulting PDF(s) and tell the teacher in chat what was produced.
+   **Filename & location — hard rules:**
+   - `--out` MUST be under `/mnt/user-data/outputs/` — never an absolute host path, the
+     conversation folder, `.allo/…`, or `tmp_eval/…`.
+   - Name the file `报告标题-课程报告评价.pdf`, where 报告标题 is the **uploaded report's
+     title** (its filename minus the extension). **Never** use student names in the
+     filename. One PDF per report; do not render the same report to two names.
+3. `present_files` the resulting PDF and tell the teacher in chat what was produced.
 
-Keep this to ~2 tool calls per student (write JSON → render). Do not re-fetch the
-evaluation or re-run scoring — this skill only renders.
+Keep this to ~2 tool calls (write JSON → render). Do not re-fetch the evaluation or
+re-run scoring — this skill only renders.
 
 ### Markdown fallback
 
@@ -48,7 +54,7 @@ renderer parses a practical subset (`#`/`##`/`###` headings, `-`/`*` bullets, pi
 tables, `**bold**`, paragraphs):
 
 ```bash
-python3 .../render_report_pdf.py --markdown eval.md --out "/mnt/user-data/outputs/张三-课程报告评价.pdf"
+python3 .../render_report_pdf.py --markdown eval.md --out "/mnt/user-data/outputs/不同温度下锂离子电池SOC估计-课程报告评价.pdf"
 ```
 
 Prefer `--data` (JSON) when you can — it gives the tidiest, most deterministic layout.

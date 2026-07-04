@@ -187,11 +187,17 @@ When you complete a **substantive deliverable** of the kind below, in addition t
 
 - Topic plan / report outline → `选题方案.md`, `报告提纲.md`
 - Three-library organization (material library / corpus library / criteria library) → `三库整理.md`
-- **Any evaluation deliverable — 六维评分 / 初终稿增量评价 / 讲解答辩评价 / 教师评语与追问 → a print-ready PDF via the `report-pdf-export` skill. PDF is the STANDARD final output, NOT Markdown.** One PDF **per student** into `/mnt/user-data/outputs/` (e.g. `李思远-课程报告评价.pdf`).
+- **Any evaluation deliverable — 六维评分 / 初终稿增量评价 / 讲解答辩评价 / 教师评语与追问 → a print-ready PDF via the `report-pdf-export` skill. PDF is the STANDARD final output, NOT Markdown.** One PDF **per report**, named after the **report/课题 title** (NOT student names), into `/mnt/user-data/outputs/` — e.g. report《锂电池SOC-SOH联合估计报告.pdf》→ `/mnt/user-data/outputs/锂电池SOC-SOH联合估计报告-课程报告评价.pdf`.
 
 Casual, process-level short replies do not need to be written to files; only "deliverable / archivable" results should be written to files and presented. Use clear, recognizable Chinese filenames.
 
-**Evaluation output is a PDF by default — do NOT stop at Markdown.** 评价类产物(六维评分/增量/讲解答辩/教师评语)的标准交付就是 **PDF**,不是"按需才导"。After you finish scoring/evaluating, the LAST step of the turn is ALWAYS to render the result with `report-pdf-export`: build a small JSON from the evaluation you already produced and render one PDF **per student** into `/mnt/user-data/outputs/`, then `present_files` it. A run that ends with only a `.md` evaluation is a **failure** — always produce the PDF. Required structure for a six-dimension evaluation PDF:
+**Evaluation output is a PDF by default — do NOT stop at Markdown.** 评价类产物(六维评分/增量/讲解答辩/教师评语)的标准交付就是 **PDF**,不是"按需才导"。After you finish scoring/evaluating, the LAST step of the turn is ALWAYS to render the result with `report-pdf-export`, then `present_files` it. A run that ends with only a `.md` evaluation is a **failure** — always produce the PDF.
+
+**File location & name — two hard rules (previous runs got these wrong):**
+- **Write ONLY to `/mnt/user-data/outputs/`.** Pass exactly `--out /mnt/user-data/outputs/<名字>.pdf` to the render script. Do NOT use absolute host paths, the conversation root, `.allo/…`, or `tmp_eval/…` — one consistent location only.
+- **Name the file after the report/课题 title, `报告标题-课程报告评价.pdf`** — take the title from the uploaded report's filename (strip the extension). **Never name it after student names.** One PDF per report. E.g. 上传《不同温度下锂离子电池SOC估计.pdf》→ `/mnt/user-data/outputs/不同温度下锂离子电池SOC估计-课程报告评价.pdf`. Do not render the same report to two different filenames.
+
+Required structure for a six-dimension evaluation PDF:
 
 1. 综合结论(简短)
 2. **六维评分表**(`scorecard`,含每维得分 + 简评)

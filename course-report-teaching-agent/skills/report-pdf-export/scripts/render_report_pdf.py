@@ -540,6 +540,79 @@ def _markdown_to_data(md: str, title: str | None) -> dict:
     return {"title": doc_title or "课程报告评价", "sections": sections}
 
 
+def _fetch_key_frame_gallery(job_id: str, out_dir: str):
+    """Fetch the course-eval key frames for a video job and return a ready 「关键帧证据」
+    section dict (saving any base64 thumbnails to image files under out_dir/关键帧证据/).
+    This is the render-level SAFETY NET so the gallery appears even if the agent got the
+    evaluation without going through the frame-saving skill command. Returns None on any
+    failure — rendering must never break because the video service is momentarily down."""
+    import base64 as _b64
+    import json as _json
+    import urllib.request
+
+    base = os.environ.get("AV_UNDERSTANDING_BASE_URL", "http://221.0.79.252:8090").rstrip("/")
+    try:
+        req = urllib.request.Request(
+            f"{base}/api/jobs/{job_id}/course-report-evaluation",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            ev = _json.load(resp)
+    except Exception:
+        return None
+
+    kf_dir = os.path.join(out_dir, "关键帧证据")
+    try:
+        os.makedirs(kf_dir, exist_ok=True)
+    except OSError:
+        return None
+
+    images: list = []
+    saved = 0
+    for dim in ev.get("oral_assessable_dimensions") or []:
+        if not isinstance(dim, dict):
+            continue
+        name = str(dim.get("dimension") or "维度")
+        for kf in dim.get("key_frames") or []:
+            if not isinstance(kf, dict):
+                continue
+            raw_tc = str(kf.get("timecode") or "")
+            why = str(kf.get("why") or "").strip()
+            caption = f"**{name}** · {raw_tc}" + (f" · {why}" if why else "")
+            fp = kf.get("frame_path")
+            thumb = kf.get("thumbnail") or ""
+            if fp and os.path.exists(fp):
+                images.append({"data": fp, "caption": caption})
+            elif isinstance(thumb, str) and thumb.startswith("data:"):
+                try:
+                    p = os.path.join(kf_dir, f"{name}_{raw_tc.replace(':', '-') or '帧'}_{saved}.jpg")
+                    with open(p, "wb") as fh:
+                        fh.write(_b64.b64decode(thumb.split(",", 1)[-1]))
+                    images.append({"data": p, "caption": caption})
+                    saved += 1
+                except Exception:
+                    pass
+    if not images:
+        return None
+    return {"heading": "关键帧证据", "blocks": [{"type": "gallery", "cols": 2, "images": images}]}
+
+
+def _inject_gallery_if_missing(data: dict, job_id: str, out_dir: str) -> None:
+    """If the report has no gallery/image block yet, fetch the video key frames and insert
+    a 「关键帧证据」 section right before the radar (else append). No-op if one already exists."""
+    sections = data.get("sections") or []
+    if any(b.get("type") in ("gallery", "image") for s in sections for b in (s.get("blocks") or [])):
+        return
+    gallery = _fetch_key_frame_gallery(job_id, out_dir)
+    if not gallery:
+        return
+    idx = next((i for i, s in enumerate(sections) if any(b.get("type") == "radar" for b in (s.get("blocks") or []))), len(sections))
+    sections.insert(idx, gallery)
+    data["sections"] = sections
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Render a course-report evaluation to a tidy PDF (one student per file).")
     parser.add_argument("--data", help="Path to a structured report JSON file.")
@@ -547,6 +620,7 @@ def main() -> int:
     parser.add_argument("--out", required=True, help="Output PDF path (e.g. /mnt/user-data/outputs/张三-课程报告评价.pdf).")
     parser.add_argument("--title", help="Report title (overrides / supplies the title).")
     parser.add_argument("--footer", help="Footer text shown on every page.")
+    parser.add_argument("--job", help="Video job_id. When given, render guarantees a 关键帧证据 gallery by fetching the key frames itself if the report JSON has none.")
     args = parser.parse_args()
 
     if not args.data and not args.markdown:
@@ -578,6 +652,14 @@ def main() -> int:
 
     out_path = os.path.abspath(os.path.expanduser(args.out))
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+
+    # Render-level safety net: guarantee the 关键帧证据 gallery for a video evaluation
+    # regardless of how the agent obtained the eval (skill command vs direct curl).
+    if args.job:
+        try:
+            _inject_gallery_if_missing(data, args.job, os.path.dirname(out_path))
+        except Exception:
+            pass  # never let the gallery net break rendering
 
     left = right = 20 * mm
     top = 18 * mm

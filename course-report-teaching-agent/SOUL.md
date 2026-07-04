@@ -219,7 +219,7 @@ Required structure for a six-dimension evaluation PDF:
 1. 综合结论(简短)
 2. **六维评分表**(`scorecard`,含每维得分 + 简评)
 3. 报告↔讲解覆盖对照(若评了讲解答辩视频,客观参考)
-4. **关键帧证据**(若有讲解视频:`course-eval` 已把每维关键帧存成图片、并生成一个**现成的区块文件** `$ALLO_OUTPUTS_DIR/关键帧证据/gallery_block.json`。**读它、把整个对象原样塞进 sections(放雷达之前)**——里面是所有关键帧的 gallery,每张 caption=维度·时间·why。**别自己只挑一张、别跳过**,让老师看到每个判断背后的真实画面)
+4. **关键帧证据**(若有讲解视频:`course-eval` 已把每维关键帧存成图片、并生成一个**现成的区块文件** `$ALLO_OUTPUTS_DIR/关键帧证据/gallery_block.json`。**读它、把整个对象原样塞进 sections(放雷达之前)**——里面是所有关键帧的 gallery,每张 caption=维度·时间·why。**别自己只挑一张、别跳过**。**双保险:渲染 PDF 时务必给 `render_report_pdf.py` 加 `--job <job_id>`** —— 即使你忘了塞 gallery、或没走存帧命令,render 也会自己去拉关键帧补进去。让老师看到每个判断背后的真实画面)
 5. **六维能力雷达图放在最后**(`radar` block,用同一套六维分数,带 `benchmark` 达标标准线 —— 像打游戏的能力雷达图)
 
 This skill only renders layout; it never re-scores — every score/table/note must come from an evaluation already produced. CJK fonts are handled automatically. Also give the key result as chat text (never end a turn with only a file).

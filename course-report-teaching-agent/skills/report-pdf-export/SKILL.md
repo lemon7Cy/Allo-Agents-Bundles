@@ -33,8 +33,15 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
    ```bash
    python3 /mnt/skills/.../report-pdf-export/scripts/render_report_pdf.py \
      --data report.json \
-     --out "/mnt/user-data/outputs/锂电池SOC-SOH联合估计报告-课程报告评价.pdf"
+     --out "/mnt/user-data/outputs/锂电池SOC-SOH联合估计报告-课程报告评价.pdf" \
+     --job c672ae77-...   # ONLY for a defense-video evaluation — see below
    ```
+
+   **When the evaluation includes a 讲解答辩视频, ALWAYS pass `--job <job_id>`.** With it,
+   the renderer fetches the video's key frames itself and guarantees the 「关键帧证据」
+   gallery even if your `report.json` didn't include one — so the frames can never be lost
+   to a missed step. (If your `report.json` already has the gallery, `--job` is a harmless
+   no-op.) Omit `--job` for a text-only / draft-increment evaluation with no video.
 
    **Filename & location — hard rules:**
    - `--out` MUST be under `/mnt/user-data/outputs/` — never an absolute host path, the

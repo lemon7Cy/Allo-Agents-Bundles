@@ -1,6 +1,6 @@
 name: course-report-teaching-agent
 bundle_version: 2
-content_revision: 12
+content_revision: 16
 description: 面向课程报告场景的教学助手，支持探索选题、材料导读、报告撰写、文稿修订、六维评价、初终稿增量分析和教学反思。
 type: agentic
 dashboard: full

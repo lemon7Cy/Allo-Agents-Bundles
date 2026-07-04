@@ -52,13 +52,13 @@ Dependency: `matplotlib` (see requirements.txt); the table still works without i
 Based on the increment table + radar chart, produce:
 - **Increment highlights**: which dimensions improved the most + the corresponding growth evidence (cite specific changes in the final draft).
 - **Remaining risks**: which dimensions are still weak, and what the final draft still lacks.
-- **Reference comments for the teacher** + **3–5 questions to ask the student** (to verify genuine understanding rather than AI ghostwriting).
+- **Reference comments for the teacher** + **3–5 questions to ask the student** (to help confirm and deepen the student's understanding).
 
-## Optional: AI baseline comparison (a stronger "do they really understand" test)
-In addition to "初稿 vs 终稿," you can add a third series 「AI独立解法」 — have the agent independently produce a version of the same topic and compare it against the "student + AI final draft." If the student's final draft **exceeds** the AI's independent solution on some dimensions, that is strong evidence of genuine student understanding. Usage: just add one more entry `"AI独立解法": [...]` to `series`, and the script will draw it into the radar chart as well.
+## Optional: AI baseline comparison (a constructive "how far beyond the AI baseline" reference)
+In addition to "初稿 vs 终稿," you can add a third series 「AI独立解法」 — have the agent independently produce a version of the same topic and compare it against the "student + AI final draft." If the student's final draft **exceeds** the AI's independent solution on some dimensions, that highlights where the student added real value beyond the tool. Usage: just add one more entry `"AI独立解法": [...]` to `series`, and the script will draw it into the radar chart as well.
 
-## Optional: presentation/defense video (the third authenticity signal)
-When a report presentation/defense recording is available, the `report-presentation-review` skill runs a **report↔oral consistency check**. Combine its `report_video_consistency` signal with this increment and the AI baseline to judge the student's **real level**: 增量扎实 + 终稿超 AI 基线 + 讲解与书面一致且能答 → 真实掌握;书面强但讲不出/讲解远薄于书面 → 疑似代写或理解不足(推测,建议答辩追问)。The video is an authenticity + corroboration layer, **not** a seventh rubric dimension — the six-dimension scores still come from `rubric.md`.
+## Optional: presentation/defense video (objective oral corroboration)
+When a report presentation/defense recording is available, the `report-presentation-review` skill provides an **objective oral corroboration** and a **report↔讲解 coverage comparison**. Use its `report_video_consistency` (covered/thin/absent, 客观参考) together with this increment and the AI baseline as extra evidence for the orally-assessable dimensions — e.g. 讲解充分复述了核心方法 → 强佐证;某要点讲解未展开 → 建议答辩补充。Describe facts and suggest improvements; **never** infer 代写/作弊. The video is an objective corroboration layer, **not** a seventh rubric dimension — the six-dimension scores still come from `rubric.md`.
 
 ## Example
 Under `examples/` there is a synthetic sample (topic + first draft + final draft + sample-scores.json), which you can run directly. ⚠️ The `examples/*.json` score files are **rendering demos, not scoring gold standards** — when you actually score a report, derive every number from `rubric.md` (its band anchors and hard-deduction checks), never by imitating the demo numbers:

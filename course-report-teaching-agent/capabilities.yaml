@@ -55,7 +55,13 @@ capabilities:
     label: 讲解答辩视频评价
     required: false
     role: assessment
-    description: 处理学生的课程报告讲解/答辩录像，映射到口头可考察的六维（创新性/数据分析深度/结论合理性），并结合书面报告做“报告↔讲解一致性核验”，给出疑似代写/理解不足的真实性提示（随包 skill：skills/report-presentation-review，调用 Allo 视频理解服务）。
+    description: 处理学生的课程报告讲解/答辩录像，映射到口头可考察的六维（创新性/数据分析深度/结论合理性）作为客观口头佐证，并结合书面报告做“报告↔讲解覆盖对照”（讲解覆盖/偏薄/未提哪些要点，客观参考、正向表述，不做代写判断；随包 skill：skills/report-presentation-review，调用 Allo 视频理解服务）。
+  - id: report-pdf-export
+    type: skill
+    label: 评价报告导出 PDF
+    required: false
+    role: delivery
+    description: 把已产出的评价（六维评分/增量评价/讲解一致性核验）渲染成规整可打印的 A4 PDF，一名学生一份；中文字体自动处理（优先嵌入系统 CJK 字体）。仅做排版渲染，不重新打分（随包 skill：skills/report-pdf-export）。
   - id: reflection-coach
     type: workflow_step
     label: 教学反思与成长建议

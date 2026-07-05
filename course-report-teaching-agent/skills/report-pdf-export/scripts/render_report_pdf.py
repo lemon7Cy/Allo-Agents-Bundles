@@ -540,13 +540,8 @@ def _markdown_to_data(md: str, title: str | None) -> dict:
     return {"title": doc_title or "课程报告评价", "sections": sections}
 
 
-def _fetch_key_frame_gallery(job_id: str, out_dir: str):
-    """Fetch the course-eval key frames for a video job and return a ready 「关键帧证据」
-    section dict (saving any base64 thumbnails to image files under out_dir/关键帧证据/).
-    This is the render-level SAFETY NET so the gallery appears even if the agent got the
-    evaluation without going through the frame-saving skill command. Returns None on any
-    failure — rendering must never break because the video service is momentarily down."""
-    import base64 as _b64
+def _fetch_course_eval(job_id: str):
+    """Fetch the (cached, no-report) course-eval for a video job. Returns the dict or None."""
     import json as _json
     import urllib.request
 
@@ -559,16 +554,21 @@ def _fetch_key_frame_gallery(job_id: str, out_dir: str):
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=180) as resp:
-            ev = _json.load(resp)
+            return _json.load(resp)
     except Exception:
         return None
+
+
+def _gallery_from_eval(ev: dict, out_dir: str):
+    """Build a ready 「关键帧证据」 gallery section from a course-eval dict (saving base64
+    thumbnails to files under out_dir/关键帧证据/). Returns the section dict or None."""
+    import base64 as _b64
 
     kf_dir = os.path.join(out_dir, "关键帧证据")
     try:
         os.makedirs(kf_dir, exist_ok=True)
     except OSError:
         return None
-
     images: list = []
     saved = 0
     for dim in ev.get("oral_assessable_dimensions") or []:
@@ -599,18 +599,75 @@ def _fetch_key_frame_gallery(job_id: str, out_dir: str):
     return {"heading": "关键帧证据", "blocks": [{"type": "gallery", "cols": 2, "images": images}]}
 
 
-def _inject_gallery_if_missing(data: dict, job_id: str, out_dir: str) -> None:
-    """If the report has no gallery/image block yet, fetch the video key frames and insert
-    a 「关键帧证据」 section right before the radar (else append). No-op if one already exists."""
+def _ensure_pose_delivery(data: dict, ev: dict) -> None:
+    """Render-level GUARANTEE for the 表达/肢体/流畅性 dimension: when the eval has a
+    pose_delivery (skeleton channel), drop any wrong "证据有限未评分 / 未检测到肢体" delivery
+    line the agent wrote (weaker models ignore the pose data and fall back to N/A), and
+    inject the authoritative pose-backed assessment. Model-independent."""
+    import re
+
+    pose = ev.get("pose_delivery") or {}
+    level = pose.get("delivery_level")
+    if not level:
+        return
+    authoritative = f"**表达/肢体/流畅性:{level}** —— {str(pose.get('evidence') or '').strip()}"
     sections = data.get("sections") or []
-    if any(b.get("type") in ("gallery", "image") for s in sections for b in (s.get("blocks") or [])):
-        return
-    gallery = _fetch_key_frame_gallery(job_id, out_dir)
-    if not gallery:
-        return
+    subj = re.compile(r"(表达|肢体|姿态|姿体|流畅|delivery)", re.I)
+    na = re.compile(r"(未评分|证据有限|证据不足|N\s*/?\s*A|未检测|无法评估|不作评分|不予评分)", re.I)
+    pose_words = re.compile(r"(静止|手势活动|骨架|移动量)")
+
+    already = False
+    for s in sections:
+        for b in s.get("blocks") or []:
+            bt = b.get("type")
+            if bt == "bullets":
+                kept = []
+                for it in b.get("items") or []:
+                    t = str(it)
+                    if subj.search(t) and pose_words.search(t):
+                        already = True
+                        kept.append(it)
+                    elif subj.search(t) and na.search(t):
+                        continue  # drop the wrong N/A delivery bullet
+                    else:
+                        kept.append(it)
+                b["items"] = kept
+            elif bt in ("paragraph", "note"):
+                t = str(b.get("text") or "")
+                if subj.search(t) and pose_words.search(t):
+                    already = True  # agent already wrote the pose-backed line
+                elif subj.search(t) and na.search(t):
+                    b["text"] = authoritative  # replace the wrong N/A delivery paragraph
+                    already = True
+    if already:
+        return  # delivery is now correct (agent had it, or we replaced the N/A in place)
+
+    target = next((s for s in sections if any(w in str(s.get("heading", "")) for w in ("讲解", "答辩"))), None)
+    if target:
+        bl = next((b for b in target.get("blocks") or [] if b.get("type") == "bullets"), None)
+        if bl is not None:
+            bl.setdefault("items", []).append(authoritative)
+            return
     idx = next((i for i, s in enumerate(sections) if any(b.get("type") == "radar" for b in (s.get("blocks") or []))), len(sections))
-    sections.insert(idx, gallery)
+    sections.insert(idx, {"heading": "表达/肢体/流畅性(骨架量化)", "blocks": [{"type": "note", "text": authoritative}]})
     data["sections"] = sections
+
+
+def _augment_from_job(data: dict, job_id: str, out_dir: str) -> None:
+    """Render-level guarantees for a video evaluation (fetch the eval once): ensure the
+    关键帧证据 gallery AND the pose-backed 表达/肢体/流畅性 dimension both appear, regardless
+    of what the (possibly weaker) agent model produced."""
+    ev = _fetch_course_eval(job_id)
+    if not ev:
+        return
+    sections = data.get("sections") or []
+    if not any(b.get("type") in ("gallery", "image") for s in sections for b in (s.get("blocks") or [])):
+        gallery = _gallery_from_eval(ev, out_dir)
+        if gallery:
+            idx = next((i for i, s in enumerate(sections) if any(b.get("type") == "radar" for b in (s.get("blocks") or []))), len(sections))
+            sections.insert(idx, gallery)
+            data["sections"] = sections
+    _ensure_pose_delivery(data, ev)
 
 
 def main() -> int:
@@ -653,13 +710,13 @@ def main() -> int:
     out_path = os.path.abspath(os.path.expanduser(args.out))
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
 
-    # Render-level safety net: guarantee the 关键帧证据 gallery for a video evaluation
-    # regardless of how the agent obtained the eval (skill command vs direct curl).
+    # Render-level guarantees for a video evaluation, regardless of the agent's model:
+    # the 关键帧证据 gallery AND the pose-backed 表达/肢体/流畅性 dimension.
     if args.job:
         try:
-            _inject_gallery_if_missing(data, args.job, os.path.dirname(out_path))
+            _augment_from_job(data, args.job, os.path.dirname(out_path))
         except Exception:
-            pass  # never let the gallery net break rendering
+            pass  # never let the render-level nets break rendering
 
     left = right = 20 * mm
     top = 18 * mm

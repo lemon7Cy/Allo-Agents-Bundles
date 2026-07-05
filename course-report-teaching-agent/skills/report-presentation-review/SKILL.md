@@ -16,7 +16,7 @@ optional_env: []
 This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds into the overall evaluation — stated positively and factually:
 - **口头佐证六维**: the video corroborates the *orally-assessable* dimensions (创新性 / 数据分析深度 / 结论合理性) with timestamped evidence. 文献引用 / 格式规范性 are written-only — the video does not judge them.
 - **报告↔讲解覆盖对照** (objective, reference only): for each key report point, did the oral explanation **cover it / touch it briefly / not mention it** — reported as plain facts for the teacher, **not** as a judgment about the student. Frame gaps constructively (e.g. "建议在答辩中补充说明 X"), never as 代写/作弊/真实性存疑.
-- **诚实**: 表达/肢体/流畅性维度现由骨架/姿态通道(`pose_delivery`)量化评估——有骨架数据就给 level+证据(手势活动度/静止占比),真无数据才标 N/A;不瞎打分,每条结论带时间戳。
+- **诚实**: 表达/肢体/流畅性维度由骨架/姿态通道量化,**由 render `--job` 权威注入,agent 不写这行**;口头维度不瞎打分,每条结论带时间戳。
 
 > Tone rule: this is a **constructive, objective** review. Do **not** produce anti-cheating / ghostwriting / authenticity language. If the oral explanation is thinner than the report, describe it factually and suggest what to clarify — do not speculate about who wrote the report.
 
@@ -68,7 +68,7 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
   - `findings[]`: per report point → `oral_status` (covered / thin / absent) + evidence + note. Report these as plain facts.
   - ⚠️ **Ignore any `authenticity_flag` / `authenticity_note` fields** the service may still return — do **not** surface them, do **not** translate them into 代写/作弊/真实性 language. They are deprecated; this review is objective and constructive only.
 - `written_only_dimensions[]` — 文献引用 / 格式规范性: explicitly "视频不评,以书面六维为准". Keep this honest boundary in the report.
-- `delivery_dimensions` — when `status == "pose_estimated"`, the **表达/肢体/流畅性** dimension IS assessed by a **skeleton/pose channel (yolov8-pose)**: use its `level` (强/中/弱) and `note`/`metrics` (骨架锁定主讲人后的手势活动度、躯干移动量、抬手占比、静止占比) as REAL quantified evidence — do NOT call it "证据不足". `pose_delivery` holds the raw metrics. Only when there is no pose data (status `evidence_limited`) fall back to a cautious "证据有限未评分".
+- `delivery_dimensions` / `pose_delivery` — the **表达/肢体/流畅性** dimension is owned by a skeleton/pose channel. **You do NOT write this line.** When you export the PDF, pass `--job <job_id>` to `render_report_pdf.py` and the renderer injects the authoritative 表达/肢体/流畅性 (level + 骨架证据) itself. Do NOT write "证据不足/未评分/未检测到肢体" for delivery — that is stale and the renderer will strip it.
 - `highlights[]` / `problems[]` — timestamped 讲解闪光点/薄弱处 (frame problems as improvement suggestions).
 - `warnings[]` — ASR/OCR quality caveats; surface them (don't score fluency down just because ASR looks broken).
 
@@ -80,7 +80,7 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 - 口头可考察维度:创新性/数据分析深度/结论合理性 —— 各 level + 时间戳证据 + 与书面分是否一致
 - 报告↔讲解覆盖对照(客观参考):overall + 逐条 findings(报告要点→讲解 covered/thin/absent),缺的以“建议答辩补充说明 X”表述
 - 闪光点 / 建议:各带 [mm:ss]
-- **表达/肢体/流畅性**:有 `pose_delivery`(骨架通道)时给 level(强/中/弱)+ 骨架证据(如「82% 时间近静止、手势极少 → 弱」),**不再标 N/A**;仅当无 pose 数据才「证据有限未评分」。文献引用/格式规范性为书面维度,视频不评
+- **表达/肢体/流畅性**:**别自己写** —— 导出 PDF 时加 `--job`,render 会从骨架通道权威注入(level+证据)。文献引用/格式规范性为书面维度,视频不评
 ```
 
 Then in the teacher's **overall** judgment, use the video as extra **objective evidence** for the orally-assessable dimensions and as a **constructive coverage reference** — e.g. "讲解充分复述了核心方法(强佐证)" or "线性插值这一步讲解中未展开,建议答辩补充". Keep it about the work and how to improve it.

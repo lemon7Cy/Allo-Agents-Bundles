@@ -56,6 +56,19 @@ trying `/usr/bin/python3` first** — installing a converter on every run is slo
 top user complaint. Use the extracted text both for the six-dimension scoring AND as the
 `report_text` you pass to `course-eval`.
 
+**⛔ 输入校验闸 —— 先确认这真是那份课程报告,再评价(否则会闷头给错文档打分)。** 文件名常只
+差『-课程报告评价』,极易把**上一份评价报告**当报告传进来。提取后立刻验一次:
+
+```bash
+grep -cE '明学慧评|六维能力雷达|教师追问建议|讲解答辩评价|达标标准线' 报告.md
+```
+
+命中 **≥2** → 传进来的是一份**「课程报告评价」而不是课程报告本身**。**立刻停下**:告诉用户"你上传的疑似
+是评价报告(不是配套课程报告),文件名常只差『-课程报告评价』,请确认后上传正确的课程报告",
+**不要评价、不要出 PDF**。course-eval 返回的 `report_input_check.is_likely_report == false`(kind
+`evaluation`/`unknown`)是同一信号 —— 命中就同样停下、按它的 `note` 提示用户。真是课程报告(有摘
+要/引言/实验/结论/参考文献结构)才继续评价。
+
 ## Multi-Expert Synthesis
 
 For complex tasks, you should internally combine the following expert perspectives, but by default only output the synthesized recommendation:

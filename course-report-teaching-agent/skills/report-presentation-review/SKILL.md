@@ -61,6 +61,12 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 
 ## What `course-eval` returns (and how to use each field)
 
+- **`report_input_check` (INPUT GUARD — check this FIRST when you passed a report).** If
+  `is_likely_report == false`, the uploaded "report" is NOT the course report — usually a
+  previous **课程报告评价** uploaded by mistake (filenames differ by only `-课程报告评价`),
+  or an unrelated/too-short doc. **STOP immediately**: tell the user per its `note`, ask them
+  to upload the correct 配套课程报告, and do NOT score or export a PDF. Never confidently
+  evaluate the wrong document.
 - `oral_assessable_dimensions[]` — for 创新性 / 数据分析深度 / 结论合理性: `level` (强/中/弱/证据不足) + `comment` + timestamped `evidence` + **`key_frames`**. **Use these to corroborate the written six-dimension scores** with oral evidence. If the report scores a dimension high but the oral level is 弱/证据不足, note it factually as "口头证据偏少,建议答辩补充".
 - **`key_frames`** (per dimension) — each has `timecode`, `why`, and a **`frame_path`**: an actual video frame that `course-eval` has already **saved as an image file** under `$ALLO_OUTPUTS_DIR/关键帧证据/`. **`course-eval` also writes a READY-TO-USE PDF section to `$ALLO_OUTPUTS_DIR/关键帧证据/gallery_block.json`** (a `{"heading":"关键帧证据","blocks":[{gallery of ALL key frames}]}` object). **When you export the PDF, read that file and splice the whole object into your `report.json` `sections` verbatim (place it right before the radar).** Do NOT hand-pick a single frame and do NOT skip it — the 关键帧证据 section with EVERY returned frame is a required part of a video-based evaluation PDF. (`_gallery_block_path` in the course-eval output points at it.)
 - `report_video_consistency` (only when you passed the report) — **objective coverage, reference only**:

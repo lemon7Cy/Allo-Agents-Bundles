@@ -82,7 +82,7 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 
 ```
 ## 讲解答辩评价(视频)
-- 处理概览:job_id、时长、证据通道(ASR/OCR/画面/摘要计数)
+- 处理概览:job_id、时长。证据通道看 `source`:**若 `source=="mimo"`,评价来自「原生音视频理解(MiMo 一遍同时读画面+听音轨、天然对齐)」——就这样写,不要把 ASR/OCR 计数当评价依据**(MiMo 不走 ASR/OCR);否则(Kimi/LLM)才写 ASR/OCR/画面/摘要计数
 - 口头可考察维度:创新性/数据分析深度/结论合理性 —— 各 level + 时间戳证据 + 与书面分是否一致
 - 报告↔讲解覆盖对照(客观参考):overall + 逐条 findings(报告要点→讲解 covered/thin/absent),缺的以“建议答辩补充说明 X”表述
 - 闪光点 / 建议:各带 [mm:ss]

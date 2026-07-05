@@ -39,6 +39,13 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 > `summary`, or `presentation` for this workflow** — the raw `timeline` is huge,
 > gets truncated, and a long tool chain makes the run stall with no answer. One
 > `health` + (reuse job_id) + one `course-eval` is the entire data step.
+>
+> ⛔ **不要自己写 Python 脚本来编排评价/提取/渲染**(如 `build_kalman_eval.py`、
+> `extract_pdf.py`、把路径写进临时文件再读之类)。**评价就用 `media_understanding.sh
+> course-eval`,提取报告就用现成 markitdown 一行,渲染就用 `render_report_pdf.py`。**
+> 自己造脚本 = 反复试错 → 撞迭代上限 → 「执行完成但无输出」。整条流程 ≤3 步工具调用:
+> `course-eval` → (读 `gallery_block.json`)→ `render_report_pdf.py --job`。发现自己在写脚本
+> 编排,立刻停手,回到这三步。路径带空格就用双引号 `"..."`,别用临时文件绕。
 
 1. **Health check** once. Stop on failure.
 2. **Get a `job_id` — reuse before re-uploading.**
@@ -96,4 +103,5 @@ Then in the teacher's **overall** judgment, use the video as extra **objective e
 - Do not turn this into a delivery/表演 talent show — the value is content understanding + report coverage, not gestures/eye-contact scores.
 - **Never** produce 代写/作弊/真实性/ghostwriting language or accuse the student. Thin coverage → describe factually + suggest what to clarify.
 - The six-dimension rubric (`../incremental-evaluation/rubric.md`) stays the frozen benchmark; the video is an objective corroboration layer, not a 7th dimension.
+- **六维评的是「书面报告」,视频只是口头佐证,绝不因视频拉高分数。** 若报告某维在书面上薄弱(如某实验章节正文为空、无数据表),该维就低分——**即使视频里学生口头/画面演示了该实验也不例外**。视频里多出来的东西写进「讲解答辩评价」段和「教师追问建议」,不要用来给书面维度加分(否则会出现"报告 4.4 节是空的、却因为视频演示了实验把数据分析分抬高"的失真)。视频与书面出现落差时,如实并列陈述,让老师自己判断。
 - `AV_UNDERSTANDING_BASE_URL` overrides the service base URL if needed (default is the Allo video service). No credential is required.

@@ -57,7 +57,7 @@
       "display_name": "星元枢算助手",
       "description": "星元枢算助手，全平台监控诊断工作台，聚合 MaaS 监测、DFCode 后台分析、飞书卡片预览与上报等能力。",
       "bundle_version": 2,
-      "content_revision": 14,
+      "content_revision": 16,
       "files": [
         "SOUL.md",
         "capabilities.yaml",

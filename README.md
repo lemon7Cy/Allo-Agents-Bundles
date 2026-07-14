@@ -31,6 +31,11 @@ Each direct child directory is one Agent Bundle:
 - `provision/` may ship installable Skill/MCP sources for one-click setup.
 - `design/` is documentation only unless Allo explicitly implements a loader for a file.
 
+> **v2 (self-contained, per-agent isolated):** bundles may instead ship capabilities
+> at the root under `skills/` and `mcp/`, which load **only for that agent** and are
+> not shared with the general assistant or other agents. See
+> [PROTOCOL-v2.md](PROTOCOL-v2.md) for the complete development contract.
+
 ## Access Fields
 
 Bundles may declare lightweight visibility policy in `config.yaml`:
@@ -46,4 +51,6 @@ Desktop mode is single-user and shows installed bundles locally. Server mode fil
 
 ## Current Bundles
 
-- `xingyuan-monitor` - 星元枢算助手, a monitoring Agent Bundle that aggregates MaaS, DFCode MCP, and notification/reporting capabilities.
+- `course-report-teaching-agent` - 教学助手，面向课程报告评审、修订、评价与教学反思。
+- `coursework-student` - 课程报告助手（学生端），提供选题、文献、写作和自评支架。
+- `xingyuan-monitor` - 星元枢算助手，聚合 MaaS、DFCode MCP 和飞书监控上报能力。

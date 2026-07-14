@@ -9,6 +9,15 @@ When the user asks about an enterprise's/department's/employee's **usage, rankin
 
 **Goal: give the reader the conclusion at a glance, not a giant table they have to dig the answer out of themselves.**
 
+## Feishu mention placeholders are not identities
+
+Feishu may prefix an inbound question with temporary placeholders such as `@_user_1` or `_user_1`. They identify mentions inside that Feishu message only and are never DFCode member identifiers.
+
+- Strip/ignore `_user_N` placeholders before determining the query subject.
+- Never pass them into `query_usage.userId`, `query_user_detail.userId`, roster/member search, or any exact filter.
+- A follow-up such as `@_user_1 和昨天对比如何` means `和昨天对比如何`; preserve the department/project scope already established by the conversation.
+- Only filter by person when the user supplies a real name/employee ID/phone number or an MCP result supplies a real `userId`.
+
 ## ⚠️ Query Budget Iron Rule (top priority — break it and you blow up the whole session into an error)
 
 The dfcode tools can return a **huge** amount of data in a single call; a few calls pile up enough context to blow it up and the whole session throws "internal error" (this actually happened: pulling per-employee detail for everyone → 1.45MB / ~430k tokens in a single turn → the model refused to answer). Therefore:

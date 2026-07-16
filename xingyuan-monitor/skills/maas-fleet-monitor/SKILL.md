@@ -53,10 +53,10 @@ Important boundaries:
 
 For questions like:
 
-- How is MaaS usage today?
-- What is the overall consumption this week?
-- Are there any risks right now?
-- Give leadership a MaaS summary.
+- 今天 MaaS 用量怎么样？
+- 本周整体消耗如何？
+- 当前有没有风险？
+- 给领导一个 MaaS 摘要。
 
 **Always run through the wrapper, from this skill's own directory** (the path shown in this skill's `<location>`). The wrapper auto-selects `.venv/bin/python` or `python3` and degrades gracefully if neither exists. Do **not** call `python scripts/web_status.py` directly and do **not** hardcode a `.venv` path.
 

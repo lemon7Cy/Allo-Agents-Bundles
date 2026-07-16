@@ -44,6 +44,12 @@ capabilities:
     required: false
     role: data
     description: 读取只读的 MaaS Web 看板/API,获取集群用量、模型分布与健康信号。随 bundle 内置于 skills/maas-fleet-monitor。
+  - id: dfcode-usage-analysis
+    type: skill
+    label: DFCode 用量管理汇报
+    required: true
+    role: analysis
+    description: 用同窗口径分析今日用量,拆解部门、人员、模型、峰值、风险与建议。随 bundle 内置于 skills/dfcode-usage-analysis。
   - id: dfcode-enterprise-mcp
     type: plugin
     label: DFCode 企业分析
@@ -54,8 +60,18 @@ policies:
   grounding: Do not invent MaaS metrics, incidents, service health, timestamps, owners, or recovery actions. Mark missing telemetry explicitly.
   severity: Do not overstate severity. Separate confirmed incidents, weak signals, and information gaps.
   feishu_format: Prefer stable labels such as 状态、范围、信号、指标、诊断、建议、缺口 when preparing Feishu monitor reports.
+  today_usage_report: Organization-level 今日用量 questions require a same-window management report with department, employee, model, peak, diagnosis, recommendation, scope, and gap sections; a bare total is incomplete.
+  feishu_card_labels:
+    - 状态
+    - 范围
+    - 信号
+    - 指标
+    - 诊断
+    - 建议
+    - 缺口
   privacy: Avoid exposing customer-sensitive or system-sensitive details unless the user supplied them for the current monitoring task.
 entry_prompts:
+  - 查查今日用量,按同窗口径输出总览、部门变化、人员升降、模型结构、峰值、诊断、建议和数据缺口。
   - 汇总今日 MaaS/星元的运行健康度,用「状态/范围/信号/指标/诊断/建议/缺口」标签输出,缺失的遥测数据要明确标注。
   - 评估这批 MaaS 观测数据,判断属于正常、关注、还是事故级风险。
   - 把这段粗略的故障记录整理成可直接发飞书的星元监控报告,包含简洁诊断和下一步动作。

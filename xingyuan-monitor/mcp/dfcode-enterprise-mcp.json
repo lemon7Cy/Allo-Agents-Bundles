@@ -1,6 +1,6 @@
 {
   "name": "dfcode-enterprise-mcp",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "DFCode Enterprise MCP Server for querying organization dashboard, usage analytics, user management, audit logs, and model endpoints.",
   "author": "dfcode",
   "type": "mcp",
@@ -25,7 +25,7 @@
     },
     {
       "name": "query_usage",
-      "description": "Usage detail and aggregation queries with single and cross-dimension aggregation support.",
+      "description": "Usage detail and aggregation queries with single and cross-dimension aggregation support. Unless the user explicitly identifies the dimension, retrieve both unfiltered department and project candidate sets, normalize/fuzzy-match across them, and disclose input -> selected dimension -> canonical name before filtering. If both dimensions plausibly match, ask for confirmation. Never infer no usage from an exact zero in a guessed dimension.",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -70,7 +70,7 @@
     },
     {
       "name": "query_roster",
-      "description": "Query employee roster/directory with search by name, employee ID, department, and status.",
+      "description": "Query employee roster/directory with search by name, employee ID, department, and status. For an uncertain department term, retrieve candidate canonical department names before applying an exact department filter; surface ambiguity instead of choosing silently.",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -106,7 +106,7 @@
     },
     {
       "name": "query_departments",
-      "description": "Cross-department analysis with range filters: usage, WoW growth, daily trends, model breakdown, and top employees per department.",
+      "description": "Cross-department analysis with range filters: usage, WoW growth, daily trends, model breakdown, and top employees per department. Use a broad date-range query to retrieve canonical department candidates before resolving shorthand, suffix variants, or likely typos. An exact-filter zero must trigger candidate matching, not a no-usage conclusion.",
       "parameters": {
         "type": "object",
         "properties": {},

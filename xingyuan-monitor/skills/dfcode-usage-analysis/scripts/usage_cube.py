@@ -85,6 +85,7 @@ from typing import Any
 
 DEFAULT_THRESHOLDS = {"growth_pct": 50.0, "drop_pct": 50.0, "silent_days": 5}
 DEFAULT_RECENT_DAYS = 5
+UNASSIGNED_DEPARTMENTS = {"", "未设置", "未分配", "(未分组)", "maas-migration-smoke"}
 # A week with tokens below this is treated as "no meaningful usage" when deciding
 # whether a person was ever "active" (used for the 由活转静 rule). Kept small and
 # absolute on purpose: the cube is in raw tokens.
@@ -95,6 +96,7 @@ SILENT_EPSILON = 1e-9  # tokens <= this counts as "silent" for a workday
 # ---------------------------------------------------------------------------
 # Small helpers
 # ---------------------------------------------------------------------------
+
 
 def _num(value: Any) -> float:
     """Coerce anything to a finite float; None/bad -> 0.0 (never raises)."""
@@ -114,6 +116,10 @@ def _str(value: Any, default: str = "") -> str:
     if value is None:
         return default
     return str(value)
+
+
+def _is_assigned_department(value: Any) -> bool:
+    return _str(value).strip() not in UNASSIGNED_DEPARTMENTS
 
 
 def _parse_date(value: Any) -> _dt.date | None:
@@ -184,6 +190,7 @@ def _is_workday(d: _dt.date, holidays: set[str], extra_workdays: set[str]) -> bo
 # The fact cube
 # ---------------------------------------------------------------------------
 
+
 class Cube:
     """The single source of truth: a list of normalized fact rows plus indexes.
 
@@ -194,11 +201,17 @@ class Cube:
         self.rows: list[dict[str, Any]] = []
         self.gaps: list[str] = []
         self.workdays: list[_dt.date] = []  # sorted, deduped, within filter
+        self.no_data_workdays: list[_dt.date] = []
+        self.start: _dt.date | None = None
+        self.end: _dt.date | None = None
+        self.workdays_only = True
+        self.holidays: set[str] = set()
+        self.extra: set[str] = set()
 
     # -- build -------------------------------------------------------------
 
     @classmethod
-    def from_input(cls, payload: dict[str, Any]) -> "Cube":
+    def from_input(cls, payload: dict[str, Any]) -> Cube:
         cube = cls()
 
         period = payload.get("period") or {}
@@ -230,25 +243,31 @@ class Cube:
             is_wd = _is_workday(d, holidays, extra)
             if workdays_only and not is_wd:
                 continue
-            cube.rows.append({
-                "employee": _str(rec.get("employee"), "(unknown)") or "(unknown)",
-                "department": _str(rec.get("department"), "(none)") or "(none)",
-                "date": d,
-                "model": _str(rec.get("model"), "(unknown)") or "(unknown)",
-                "tokens": _num(rec.get("tokens")),
-                "requests": _num(rec.get("requests")),
-                "is_workday": is_wd,
-            })
+            cube.rows.append(
+                {
+                    "employee": _str(rec.get("employee"), "(unknown)") or "(unknown)",
+                    "department": _str(rec.get("department"), "(none)") or "(none)",
+                    "date": d,
+                    "model": _str(rec.get("model"), "(unknown)") or "(unknown)",
+                    "tokens": _num(rec.get("tokens")),
+                    "requests": _num(rec.get("requests")),
+                    "is_workday": is_wd,
+                }
+            )
 
         if skipped:
-            cube.gaps.append(f"{skipped} malformed row(s) skipped (not a dict / no valid date)")
+            cube.gaps.append(
+                f"{skipped} malformed row(s) skipped (not a dict / no valid date)"
+            )
 
         # workday calendar for the (filtered) data span
         cube._compute_calendar(start, end, holidays, extra)
 
         # gap notes about calendar assumptions
         if not holidays:
-            cube.gaps.append("no holidays provided → workdays = Mon-Fri, 调休/节假日未校正")
+            cube.gaps.append(
+                "no holidays provided → workdays = Mon-Fri, 调休/节假日未校正"
+            )
         if not extra:
             cube.gaps.append("no extra_workdays provided → 调休补班日未纳入工作日")
 
@@ -265,7 +284,7 @@ class Cube:
         (we do NOT cap the upper bound at the last date that has data), so recent
         workdays with no records still enter the calendar and a whole-team recent
         silence is visible to recent_days_view."""
-        self.no_data_workdays: list[_dt.date] = []
+        self.no_data_workdays = []
         present = sorted({r["date"] for r in self.rows})
         lo = start if start else (present[0] if present else None)
         hi = end if end else (present[-1] if present else None)
@@ -297,7 +316,10 @@ class Cube:
 # Week bucketing
 # ---------------------------------------------------------------------------
 
-def _week_labels(workdays: list[_dt.date]) -> tuple[list[_dt.date], dict[_dt.date, str]]:
+
+def _week_labels(
+    workdays: list[_dt.date],
+) -> tuple[list[_dt.date], dict[_dt.date, str]]:
     """Return (ordered list of week-Mondays, {monday: label}).
 
     label like "W1 6/2-6/6" using the first & last workday that fall in the
@@ -319,6 +341,7 @@ def _week_labels(workdays: list[_dt.date]) -> tuple[list[_dt.date], dict[_dt.dat
 # View builders (all derive from the cube)
 # ---------------------------------------------------------------------------
 
+
 def _dept_daily(cube: Cube) -> list[dict[str, Any]]:
     agg: dict[_dt.date, dict[str, float]] = {}
     for r in cube.rows:
@@ -327,12 +350,14 @@ def _dept_daily(cube: Cube) -> list[dict[str, Any]]:
         a["requests"] += r["requests"]
     out = []
     for d in sorted(agg):
-        out.append({
-            "date": d.isoformat(),
-            "tokens": round(agg[d]["tokens"], 2),
-            "requests": round(agg[d]["requests"], 2),
-            "is_workday": _is_workday(d, cube.holidays, cube.extra),
-        })
+        out.append(
+            {
+                "date": d.isoformat(),
+                "tokens": round(agg[d]["tokens"], 2),
+                "requests": round(agg[d]["requests"], 2),
+                "is_workday": _is_workday(d, cube.holidays, cube.extra),
+            }
+        )
     return out
 
 
@@ -344,14 +369,18 @@ def _week_token_map(cube: Cube, rows: list[dict[str, Any]]) -> dict[_dt.date, fl
     return wk
 
 
-def _dept_weekly(cube: Cube, labels: dict[_dt.date, str], mondays: list[_dt.date]) -> list[dict[str, Any]]:
+def _dept_weekly(
+    cube: Cube, labels: dict[_dt.date, str], mondays: list[_dt.date]
+) -> list[dict[str, Any]]:
     wk = _week_token_map(cube, cube.rows)
     out = []
     for mon in mondays:
-        out.append({
-            "week_label": labels.get(mon, mon.isoformat()),
-            "tokens": round(wk.get(mon, 0.0), 2),
-        })
+        out.append(
+            {
+                "week_label": labels.get(mon, mon.isoformat()),
+                "tokens": round(wk.get(mon, 0.0), 2),
+            }
+        )
     return out
 
 
@@ -359,8 +388,12 @@ def _overall(cube: Cube, weekly: list[dict[str, Any]]) -> dict[str, Any]:
     total = round(sum(w["tokens"] for w in weekly), 2)
     if not weekly:
         return {
-            "first_week_tokens": 0.0, "last_week_tokens": 0.0, "delta_pct": 0.0,
-            "total_tokens": 0.0, "trend": "flat", "inflection_weeks": [],
+            "first_week_tokens": 0.0,
+            "last_week_tokens": 0.0,
+            "delta_pct": 0.0,
+            "total_tokens": 0.0,
+            "trend": "flat",
+            "inflection_weeks": [],
         }
     first = weekly[0]["tokens"]
     last = weekly[-1]["tokens"]
@@ -376,8 +409,12 @@ def _overall(cube: Cube, weekly: list[dict[str, Any]]) -> dict[str, Any]:
     if len(weekly) >= 2:
         changes = []
         for i in range(1, len(weekly)):
-            changes.append((abs(weekly[i]["tokens"] - weekly[i - 1]["tokens"]),
-                            weekly[i]["week_label"]))
+            changes.append(
+                (
+                    abs(weekly[i]["tokens"] - weekly[i - 1]["tokens"]),
+                    weekly[i]["week_label"],
+                )
+            )
         max_change = max(c[0] for c in changes)
         if max_change > 0:
             inflection = [lbl for ch, lbl in changes if ch == max_change]
@@ -398,11 +435,13 @@ def _model_share(cube: Cube) -> list[dict[str, Any]]:
     total = sum(agg.values())
     out = []
     for model in sorted(agg, key=lambda m: (-agg[m], m)):  # desc, tie-break by name
-        out.append({
-            "model": model,
-            "tokens": round(agg[model], 2),
-            "pct": round(agg[model] / total * 100.0, 1) if total > 0 else 0.0,
-        })
+        out.append(
+            {
+                "model": model,
+                "tokens": round(agg[model], 2),
+                "pct": round(agg[model] / total * 100.0, 1) if total > 0 else 0.0,
+            }
+        )
     return out
 
 
@@ -481,14 +520,14 @@ def _per_person(
         slope = _slope([v for _, v in workday_series])
 
         # top model + per-model trend (first vs last week the model appears)
-        model_first: dict[str, tuple[_dt.date, float]] = {}
-        model_last: dict[str, tuple[_dt.date, float]] = {}
         model_total: dict[str, float] = {}
         model_week: dict[str, dict[_dt.date, float]] = {}
         for r in rows:
             mon = _iso_monday(r["date"])
             model_week.setdefault(r["model"], {})
-            model_week[r["model"]][mon] = model_week[r["model"]].get(mon, 0.0) + r["tokens"]
+            model_week[r["model"]][mon] = (
+                model_week[r["model"]].get(mon, 0.0) + r["tokens"]
+            )
             model_total[r["model"]] = model_total.get(r["model"], 0.0) + r["tokens"]
         model_trend = []
         for m in sorted(model_week, key=lambda m: (-model_total[m], m)):
@@ -496,29 +535,40 @@ def _per_person(
             mweeks = sorted(mw)
             mf = round(mw[mweeks[0]], 2)
             ml = round(mw[mweeks[-1]], 2)
-            model_trend.append({
-                "model": m, "first": mf, "last": ml, "delta_pct": _pct_change(mf, ml),
-            })
+            model_trend.append(
+                {
+                    "model": m,
+                    "first": mf,
+                    "last": ml,
+                    "delta_pct": _pct_change(mf, ml),
+                }
+            )
         top_model = model_trend[0]["model"] if model_trend else "(none)"
 
         cls = _classify_person(delta, slope, wk, workday_series, thresholds)
 
-        out.append({
-            "employee": emp,
-            "department": dept_of.get(emp, "(none)"),
-            "first_tokens": first_tok,
-            "last_tokens": last_tok,
-            "delta_pct": delta,
-            "slope": slope,
-            "total_tokens": total,
-            "top_model": top_model,
-            "class": cls,
-            "model_trend": model_trend,
-            "_weeks_present": len(weeks_present),  # internal, stripped before output
-        })
+        out.append(
+            {
+                "employee": emp,
+                "department": dept_of.get(emp, "(none)"),
+                "first_tokens": first_tok,
+                "last_tokens": last_tok,
+                "delta_pct": delta,
+                "slope": slope,
+                "total_tokens": total,
+                "top_model": top_model,
+                "class": cls,
+                "model_trend": model_trend,
+                "_weeks_present": len(
+                    weeks_present
+                ),  # internal, stripped before output
+            }
+        )
 
         if len(weeks_present) < 2:
-            cube.gaps.append(f"person {emp} has <2 weeks of data → trend low-confidence")
+            cube.gaps.append(
+                f"person {emp} has <2 weeks of data → trend low-confidence"
+            )
 
     # deterministic order: by employee name
     out.sort(key=lambda p: p["employee"])
@@ -537,7 +587,7 @@ def _recent_days_view(
     wds = cube.workdays
     window = max(1, int(recent_days))
     recent = wds[-window:] if wds else []
-    prior = wds[-2 * window:-window] if len(wds) >= window else []
+    prior = wds[-2 * window : -window] if len(wds) >= window else []
     recent_set = set(recent)
     prior_set = set(prior)
 
@@ -558,20 +608,24 @@ def _recent_days_view(
         per_day: dict[_dt.date, float] = {}
         for r in rows:
             per_day[r["date"]] = per_day.get(r["date"], 0.0) + r["tokens"]
-        r_avg = (sum(per_day.get(d, 0.0) for d in recent) / len(recent)) if recent else 0.0
+        r_avg = (
+            (sum(per_day.get(d, 0.0) for d in recent) / len(recent)) if recent else 0.0
+        )
         p_avg = (sum(per_day.get(d, 0.0) for d in prior) / len(prior)) if prior else 0.0
         drop_pct = _pct_change(p_avg, r_avg)
         active_days = [d for d in cube.workdays if per_day.get(d, 0.0) > SILENT_EPSILON]
         last_active = active_days[-1].isoformat() if active_days else None
         # only report genuine drops (negative change AND had prior usage)
         if p_avg > SILENT_EPSILON and drop_pct < 0:
-            drops.append({
-                "employee": emp,
-                "prior_avg": round(p_avg, 2),
-                "recent_avg": round(r_avg, 2),
-                "drop_pct": drop_pct,
-                "last_active_date": last_active,
-            })
+            drops.append(
+                {
+                    "employee": emp,
+                    "prior_avg": round(p_avg, 2),
+                    "recent_avg": round(r_avg, 2),
+                    "drop_pct": drop_pct,
+                    "last_active_date": last_active,
+                }
+            )
     # most severe drop first; tie-break by name for determinism
     drops.sort(key=lambda x: (x["drop_pct"], x["employee"]))
 
@@ -606,14 +660,21 @@ def _week_over_week_view(cube: Cube) -> dict[str, Any]:
     """
     wds = cube.workdays
     empty = {
-        "current_week_monday": None, "prev_week_monday": None,
-        "current_workdays": [], "matched_prior_workdays": [],
-        "dept_wow_pct": 0.0, "by_weekday": [], "per_person_drops": [],
+        "current_week_monday": None,
+        "prev_week_monday": None,
+        "current_workdays": [],
+        "matched_prior_workdays": [],
+        "dept_wow_pct": 0.0,
+        "by_weekday": [],
+        "per_person_drops": [],
     }
     if not wds:
         return empty
     cur_monday = _iso_monday(wds[-1])
-    all_pairs = [(d, d - _dt.timedelta(days=7)) for d in sorted(d for d in wds if _iso_monday(d) == cur_monday)]
+    all_pairs = [
+        (d, d - _dt.timedelta(days=7))
+        for d in sorted(d for d in wds if _iso_monday(d) == cur_monday)
+    ]
     # Drop pairs whose prior-week day predates the input period: outside-of-input
     # days read as 0 tokens and every such pair scores +100%, skewing dept_wow_pct
     # (real incident: a 6/29↔6/22 pair with 6/22 outside the fed period inflated
@@ -624,7 +685,9 @@ def _week_over_week_view(cube: Cube) -> dict[str, Any]:
     if not pairs:
         out = dict(empty)
         out["dropped_unmatched_pairs"] = dropped_pairs
-        out["note"] = f"{dropped_pairs} 组配对的上周同星期几早于输入期首日,全部剔除——需喂入完整上一周才能做周同比"
+        out["note"] = (
+            f"{dropped_pairs} 组配对的上周同星期几早于输入期首日,全部剔除——需喂入完整上一周才能做周同比"
+        )
         return out
     cur_set = {d for d, _ in pairs}
     prev_set = {p for _, p in pairs}
@@ -639,8 +702,10 @@ def _week_over_week_view(cube: Cube) -> dict[str, Any]:
     dept_pct = _pct_change(avg(prev_set), avg(cur_set))
     by_weekday = [
         {
-            "current_date": d.isoformat(), "prior_date": p.isoformat(),
-            "current": round(by_date.get(d, 0.0), 2), "prior": round(by_date.get(p, 0.0), 2),
+            "current_date": d.isoformat(),
+            "prior_date": p.isoformat(),
+            "current": round(by_date.get(d, 0.0), 2),
+            "prior": round(by_date.get(p, 0.0), 2),
             "pct": _pct_change(by_date.get(p, 0.0), by_date.get(d, 0.0)),
         }
         for d, p in pairs
@@ -651,11 +716,25 @@ def _week_over_week_view(cube: Cube) -> dict[str, Any]:
         per_day: dict[_dt.date, float] = {}
         for r in _person_rows(cube, emp):
             per_day[r["date"]] = per_day.get(r["date"], 0.0) + r["tokens"]
-        c = (sum(per_day.get(d, 0.0) for d in cur_set) / len(cur_set)) if cur_set else 0.0
-        pv = (sum(per_day.get(d, 0.0) for d in prev_set) / len(prev_set)) if prev_set else 0.0
+        c = (
+            (sum(per_day.get(d, 0.0) for d in cur_set) / len(cur_set))
+            if cur_set
+            else 0.0
+        )
+        pv = (
+            (sum(per_day.get(d, 0.0) for d in prev_set) / len(prev_set))
+            if prev_set
+            else 0.0
+        )
         if pv > SILENT_EPSILON and c < pv:
-            drops.append({"employee": emp, "prior_avg": round(pv, 2),
-                          "current_avg": round(c, 2), "drop_pct": _pct_change(pv, c)})
+            drops.append(
+                {
+                    "employee": emp,
+                    "prior_avg": round(pv, 2),
+                    "current_avg": round(c, 2),
+                    "drop_pct": _pct_change(pv, c),
+                }
+            )
     drops.sort(key=lambda x: (x["drop_pct"], x["employee"]))
 
     out = {
@@ -669,13 +748,16 @@ def _week_over_week_view(cube: Cube) -> dict[str, Any]:
         "dropped_unmatched_pairs": dropped_pairs,
     }
     if dropped_pairs:
-        out["note"] = f"{dropped_pairs} 组配对的上周同星期几早于输入期首日已剔除,周同比仅基于 {len(pairs)} 组完整配对"
+        out["note"] = (
+            f"{dropped_pairs} 组配对的上周同星期几早于输入期首日已剔除,周同比仅基于 {len(pairs)} 组完整配对"
+        )
     return out
 
 
 # ---------------------------------------------------------------------------
 # Top-level assembly
 # ---------------------------------------------------------------------------
+
 
 def _resolve_thresholds(payload: dict[str, Any]) -> dict[str, float]:
     th = dict(DEFAULT_THRESHOLDS)
@@ -752,7 +834,9 @@ def build_result(payload: dict[str, Any]) -> dict[str, Any]:
         first_n, last_n = per_week_days[mondays[0]], per_week_days[mondays[-1]]
         full_n = max(per_week_days.values())
         if last_n < full_n or first_n < full_n:
-            cube.gaps.append(f"首/末周工作日数不等长(首周 {first_n} 天,末周 {last_n} 天,完整周 {full_n} 天)——overall 首末周对比含不完整周,趋势结论以 week_over_week(同星期几配对)为准")
+            cube.gaps.append(
+                f"首/末周工作日数不等长(首周 {first_n} 天,末周 {last_n} 天,完整周 {full_n} 天)——overall 首末周对比含不完整周,趋势结论以 week_over_week(同星期几配对)为准"
+            )
 
     # strip internal fields before emitting
     def _clean(p: dict[str, Any]) -> dict[str, Any]:
@@ -785,11 +869,14 @@ def build_result(payload: dict[str, Any]) -> dict[str, Any]:
 # Markdown digest (for the agent to read instead of raw JSON)
 # ---------------------------------------------------------------------------
 
+
 def render_markdown(result: dict[str, Any]) -> str:
     s = result["scope"]
     o = result["overall"]
     lines: list[str] = []
-    lines.append("# 用量分析数字底稿 (engine digest — numbers are authoritative, do NOT recompute)")
+    lines.append(
+        "# 用量分析数字底稿 (engine digest — numbers are authoritative, do NOT recompute)"
+    )
     p = s["period"]
     lines.append(
         f"- 范围: {p.get('start')} → {p.get('end')} | 仅工作日={s['workdays_only']} | "
@@ -848,10 +935,14 @@ def render_markdown(result: dict[str, Any]) -> str:
 
     rv = result["recent_days_view"]
     lines.append("")
-    lines.append(f"## 最近 {rv['window_days']} 工作日 vs 前 {rv['window_days']} 工作日 (recent_days_view)")
+    lines.append(
+        f"## 最近 {rv['window_days']} 工作日 vs 前 {rv['window_days']} 工作日 (recent_days_view)"
+    )
     lines.append(f"- 近窗工作日: {', '.join(rv['recent_workdays']) or '(none)'}")
     lines.append(f"- 前窗工作日: {', '.join(rv['prior_workdays']) or '(none)'}")
-    lines.append(f"- 部门近窗 vs 前窗(按工作日均值): Δ={rv['dept_recent_vs_prior_pct']}%")
+    lines.append(
+        f"- 部门近窗 vs 前窗(按工作日均值): Δ={rv['dept_recent_vs_prior_pct']}%"
+    )
     if rv["per_person_drops"]:
         lines.append("- 个人掉量(均值, 近 vs 前):")
         for d in rv["per_person_drops"]:
@@ -905,6 +996,7 @@ def render_markdown(result: dict[str, Any]) -> str:
 # Self test
 # ---------------------------------------------------------------------------
 
+
 def _selftest() -> int:
     """Run a synthetic dataset and assert concrete numbers. PASS/FAIL + exit code.
 
@@ -921,8 +1013,16 @@ def _selftest() -> int:
     records = []
 
     def add(emp, dept, date, model, tokens, requests=1):
-        records.append({"employee": emp, "department": dept, "date": date,
-                        "model": model, "tokens": tokens, "requests": requests})
+        records.append(
+            {
+                "employee": emp,
+                "department": dept,
+                "date": date,
+                "model": model,
+                "tokens": tokens,
+                "requests": requests,
+            }
+        )
 
     week1 = ["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05"]
     week2 = ["2026-06-08", "2026-06-09", "2026-06-10", "2026-06-11", "2026-06-12"]
@@ -974,26 +1074,45 @@ def _selftest() -> int:
     # Alice 10, Bob 6, Carol 10, Dave 5 = 31 rows
     check("n_records", scope["n_records"] == 31, f"got {scope['n_records']} (want 31)")
     check("n_people", scope["n_people"] == 4, f"got {scope['n_people']} (want 4)")
-    check("n_workdays", scope["n_workdays"] == 10, f"got {scope['n_workdays']} (want 10)")
+    check(
+        "n_workdays", scope["n_workdays"] == 10, f"got {scope['n_workdays']} (want 10)"
+    )
 
     # weekend giant tokens must NOT appear anywhere
-    check("weekend_excluded",
-          all(d["date"] not in ("2026-06-06", "2026-06-07") for d in result["dept_daily"]),
-          "weekend dates leaked into dept_daily")
+    check(
+        "weekend_excluded",
+        all(
+            d["date"] not in ("2026-06-06", "2026-06-07") for d in result["dept_daily"]
+        ),
+        "weekend dates leaked into dept_daily",
+    )
 
     # ---- dept overall delta ----
     # week1 dept tokens: Alice1500 + Bob5000 + Carol2500 + Dave4000 = 13000
     # week2 dept tokens: Alice6000 + Bob1   + Carol2500 + Dave0    = 8501
     weekly = {w["week_label"].split()[0]: w["tokens"] for w in result["dept_weekly"]}
-    check("week1_total", weekly.get("W1") == 13000, f"got {weekly.get('W1')} (want 13000)")
-    check("week2_total", weekly.get("W2") == 8501, f"got {weekly.get('W2')} (want 8501)")
+    check(
+        "week1_total", weekly.get("W1") == 13000, f"got {weekly.get('W1')} (want 13000)"
+    )
+    check(
+        "week2_total", weekly.get("W2") == 8501, f"got {weekly.get('W2')} (want 8501)"
+    )
     # delta = (8501-13000)/13000*100 = -34.6%
-    check("dept_delta", result["overall"]["delta_pct"] == -34.6,
-          f"got {result['overall']['delta_pct']} (want -34.6)")
-    check("dept_trend", result["overall"]["trend"] == "down",
-          f"got {result['overall']['trend']}")
-    check("dept_total", result["overall"]["total_tokens"] == 21501,
-          f"got {result['overall']['total_tokens']} (want 21501)")
+    check(
+        "dept_delta",
+        result["overall"]["delta_pct"] == -34.6,
+        f"got {result['overall']['delta_pct']} (want -34.6)",
+    )
+    check(
+        "dept_trend",
+        result["overall"]["trend"] == "down",
+        f"got {result['overall']['trend']}",
+    )
+    check(
+        "dept_total",
+        result["overall"]["total_tokens"] == 21501,
+        f"got {result['overall']['total_tokens']} (want 21501)",
+    )
 
     # ---- one growth person: Alice ----
     growth_names = [p["employee"] for p in result["growth"]]
@@ -1005,7 +1124,11 @@ def _selftest() -> int:
         check("alice_delta", alice["delta_pct"] == 300.0, f"got {alice['delta_pct']}")
         check("alice_slope_pos", alice["slope"] > 0, f"slope={alice['slope']}")
         check("alice_class", alice["class"] == "growth", f"class={alice['class']}")
-        check("alice_top_model", alice["top_model"] == "gpt-x", f"top={alice['top_model']}")
+        check(
+            "alice_top_model",
+            alice["top_model"] == "gpt-x",
+            f"top={alice['top_model']}",
+        )
 
     # ---- one decline person (magnitude): Bob ----
     decline_names = [p["employee"] for p in result["decline"]]
@@ -1019,7 +1142,11 @@ def _selftest() -> int:
     # ---- decline by 由活转静: Dave ----
     dave = next((p for p in result["per_person"] if p["employee"] == "Dave"), None)
     if dave:
-        check("dave_class", dave["class"] == "decline", f"class={dave['class']} (want decline 由活转静)")
+        check(
+            "dave_class",
+            dave["class"] == "decline",
+            f"class={dave['class']} (want decline 由活转静)",
+        )
     check("dave_in_decline", "Dave" in decline_names, f"decline={decline_names}")
 
     # ---- Carol steady ----
@@ -1030,10 +1157,16 @@ def _selftest() -> int:
     # ---- recent-days view (window=2): recent = 6/11,6/12 ; prior = 6/9,6/10 ----
     rv = result["recent_days_view"]
     check("recent_window", rv["window_days"] == 2, f"got {rv['window_days']}")
-    check("recent_days_list", rv["recent_workdays"] == ["2026-06-11", "2026-06-12"],
-          f"got {rv['recent_workdays']}")
-    check("prior_days_list", rv["prior_workdays"] == ["2026-06-09", "2026-06-10"],
-          f"got {rv['prior_workdays']}")
+    check(
+        "recent_days_list",
+        rv["recent_workdays"] == ["2026-06-11", "2026-06-12"],
+        f"got {rv['recent_workdays']}",
+    )
+    check(
+        "prior_days_list",
+        rv["prior_workdays"] == ["2026-06-09", "2026-06-10"],
+        f"got {rv['prior_workdays']}",
+    )
     # Dave silent in both recent windows (no wk2 usage) -> prior_avg 0 -> not a drop row.
     # Bob: prior(6/9,6/10)=0 each -> prior_avg 0 -> not listed (no prior usage in window).
     # Carol: prior 500/500, recent 500/500 -> drop_pct 0 -> not <0 -> not listed.
@@ -1045,10 +1178,38 @@ def _selftest() -> int:
     # To prove the recent-drop machinery actually fires, run a second tiny case:
     recent_payload = {
         "records": [
-            {"employee": "Eve", "department": "D", "date": "2026-06-09", "model": "m", "tokens": 1000, "requests": 1},
-            {"employee": "Eve", "department": "D", "date": "2026-06-10", "model": "m", "tokens": 1000, "requests": 1},
-            {"employee": "Eve", "department": "D", "date": "2026-06-11", "model": "m", "tokens": 100, "requests": 1},
-            {"employee": "Eve", "department": "D", "date": "2026-06-12", "model": "m", "tokens": 100, "requests": 1},
+            {
+                "employee": "Eve",
+                "department": "D",
+                "date": "2026-06-09",
+                "model": "m",
+                "tokens": 1000,
+                "requests": 1,
+            },
+            {
+                "employee": "Eve",
+                "department": "D",
+                "date": "2026-06-10",
+                "model": "m",
+                "tokens": 1000,
+                "requests": 1,
+            },
+            {
+                "employee": "Eve",
+                "department": "D",
+                "date": "2026-06-11",
+                "model": "m",
+                "tokens": 100,
+                "requests": 1,
+            },
+            {
+                "employee": "Eve",
+                "department": "D",
+                "date": "2026-06-12",
+                "model": "m",
+                "tokens": 100,
+                "requests": 1,
+            },
         ],
         "period": {"start": "2026-06-08", "end": "2026-06-12"},
         "workdays_only": True,
@@ -1060,16 +1221,25 @@ def _selftest() -> int:
     if eve:
         # prior avg 1000, recent avg 100 -> -90%
         check("eve_drop_pct", eve["drop_pct"] == -90.0, f"got {eve['drop_pct']}")
-    check("eve_dept_pct", rv2["dept_recent_vs_prior_pct"] == -90.0,
-          f"got {rv2['dept_recent_vs_prior_pct']}")
+    check(
+        "eve_dept_pct",
+        rv2["dept_recent_vs_prior_pct"] == -90.0,
+        f"got {rv2['dept_recent_vs_prior_pct']}",
+    )
 
     # ---- week_over_week (same-weekday): week2 (current) vs week1 (prior) ----
     # current week = week of last workday 6/12 -> Monday 6/8; paired to 6/1 week.
     wow = result["week_over_week"]
-    check("wow_current_week", wow["current_week_monday"] == "2026-06-08",
-          f"got {wow['current_week_monday']}")
-    check("wow_prev_week", wow["prev_week_monday"] == "2026-06-01",
-          f"got {wow['prev_week_monday']}")
+    check(
+        "wow_current_week",
+        wow["current_week_monday"] == "2026-06-08",
+        f"got {wow['current_week_monday']}",
+    )
+    check(
+        "wow_prev_week",
+        wow["prev_week_monday"] == "2026-06-01",
+        f"got {wow['prev_week_monday']}",
+    )
     # dept same-weekday avg: wk1 13000/5=2600 -> wk2 8501/5=1700.2 => -34.6%
     check("wow_dept_pct", wow["dept_wow_pct"] == -34.6, f"got {wow['dept_wow_pct']}")
     # Bob (1000->~0) and Dave (800->silent) drop same-weekday; Alice rose, Carol steady.
@@ -1077,15 +1247,26 @@ def _selftest() -> int:
     check("wow_drops", "Bob" in wow_drops and "Dave" in wow_drops, f"got {wow_drops}")
 
     # ---- gaps must mention malformed rows ----
-    check("gap_malformed", any("malformed" in g for g in result["gaps"]),
-          f"gaps={result['gaps']}")
+    check(
+        "gap_malformed",
+        any("malformed" in g for g in result["gaps"]),
+        f"gaps={result['gaps']}",
+    )
 
     # ---- empty input must not throw and yields a valid empty result ----
     try:
-        empty = build_result({"records": [], "period": {"start": "2026-06-01", "end": "2026-06-05"}})
+        empty = build_result(
+            {"records": [], "period": {"start": "2026-06-01", "end": "2026-06-05"}}
+        )
         check("empty_scope", empty["scope"]["n_records"] == 0, "empty n_records != 0")
-        check("empty_overall", empty["overall"]["trend"] == "flat", "empty trend not flat")
-        check("empty_gap", any("empty result" in g for g in empty["gaps"]), "empty gap note missing")
+        check(
+            "empty_overall", empty["overall"]["trend"] == "flat", "empty trend not flat"
+        )
+        check(
+            "empty_gap",
+            any("empty result" in g for g in empty["gaps"]),
+            "empty gap note missing",
+        )
     except Exception as exc:  # pragma: no cover - must never happen
         check("empty_no_throw", False, f"threw {exc!r}")
 
@@ -1103,115 +1284,300 @@ def _selftest() -> int:
     # same-window: 1600 -> 1760 = +10.0%
     # naive partial-vs-full: 2000 -> 1760 = -12.0%  (sign flip vs +10% — the whole point)
     # projection: 1760 * 2000/1600 = 2200 -> +10.0% vs baseline full
-    intraday_items = (
-        [{"hour": f"{h:02d}:00", "date": "2026-06-10", "totalTokens": 100, "requests": 2} for h in range(20)]
-        + [{"hour": h, "date": "2026-06-11", "totalTokens": 110, "requests": 2, "model": "gpt-x"} for h in range(16)]
-    )
+    intraday_items = [
+        {"hour": f"{h:02d}:00", "date": "2026-06-10", "totalTokens": 100, "requests": 2}
+        for h in range(20)
+    ] + [
+        {
+            "hour": h,
+            "date": "2026-06-11",
+            "totalTokens": 110,
+            "requests": 2,
+            "model": "gpt-x",
+        }
+        for h in range(16)
+    ]
     intr = build_intraday_result({"items": intraday_items, "cutoff_hour": 16})
     o = intr["overall"]
-    check("intr_dates", intr["today"] == "2026-06-11" and intr["baseline"] == "2026-06-10",
-          f"got {intr['today']} / {intr['baseline']}")
-    check("intr_window", o["baseline_window"]["tokens"] == 1600.0 and o["today_window"]["tokens"] == 1760.0,
-          f"got {o['baseline_window']['tokens']} -> {o['today_window']['tokens']}")
-    check("intr_same_window", o["same_window_delta_pct"] == 10.0, f"got {o['same_window_delta_pct']}")
-    check("intr_naive_flips_sign", o["naive_partial_vs_full_pct"] == -12.0, f"got {o['naive_partial_vs_full_pct']}")
-    check("intr_projection", o["projected_today_full_tokens"] == 2200.0 and o["projected_vs_baseline_full_pct"] == 10.0,
-          f"got {o['projected_today_full_tokens']} / {o['projected_vs_baseline_full_pct']}")
+    check(
+        "intr_dates",
+        intr["today"] == "2026-06-11" and intr["baseline"] == "2026-06-10",
+        f"got {intr['today']} / {intr['baseline']}",
+    )
+    check(
+        "intr_window",
+        o["baseline_window"]["tokens"] == 1600.0
+        and o["today_window"]["tokens"] == 1760.0,
+        f"got {o['baseline_window']['tokens']} -> {o['today_window']['tokens']}",
+    )
+    check(
+        "intr_same_window",
+        o["same_window_delta_pct"] == 10.0,
+        f"got {o['same_window_delta_pct']}",
+    )
+    check(
+        "intr_naive_flips_sign",
+        o["naive_partial_vs_full_pct"] == -12.0,
+        f"got {o['naive_partial_vs_full_pct']}",
+    )
+    check(
+        "intr_projection",
+        o["projected_today_full_tokens"] == 2200.0
+        and o["projected_vs_baseline_full_pct"] == 10.0,
+        f"got {o['projected_today_full_tokens']} / {o['projected_vs_baseline_full_pct']}",
+    )
     # per-series: gpt-x rows only exist today -> baseline window 0 -> +100% capped rule
     gptx = next((b for b in intr["per_series"] if b["series"] == "gpt-x"), None)
-    check("intr_series_present", gptx is not None, f"per_series={[b['series'] for b in intr['per_series']]}")
+    check(
+        "intr_series_present",
+        gptx is not None,
+        f"per_series={[b['series'] for b in intr['per_series']]}",
+    )
     # derived cutoff (no cutoff_hour): today's last active hour is 15 -> cutoff 16, same numbers
     intr2 = build_intraday_result({"items": intraday_items})
-    check("intr_derived_cutoff", intr2["cutoff_hour"] == 16, f"got {intr2['cutoff_hour']}")
-    check("intr_derived_gap_note", any("cutoff_hour not provided" in g for g in intr2["gaps"]),
-          f"gaps={intr2['gaps']}")
+    check(
+        "intr_derived_cutoff", intr2["cutoff_hour"] == 16, f"got {intr2['cutoff_hour']}"
+    )
+    check(
+        "intr_derived_gap_note",
+        any("cutoff_hour not provided" in g for g in intr2["gaps"]),
+        f"gaps={intr2['gaps']}",
+    )
     # markdown must not throw and must carry the headline + forbidden labels
     try:
         imd = render_intraday_markdown(intr)
-        check("intr_md_headline", "同窗对比" in imd and "禁止口径" in imd, "intraday md missing key labels")
+        check(
+            "intr_md_headline",
+            "同窗对比" in imd and "禁止口径" in imd,
+            "intraday md missing key labels",
+        )
     except Exception as exc:  # pragma: no cover
         check("intr_md_no_throw", False, f"render_intraday_markdown threw {exc!r}")
 
     # ---- per-user / per-department expected-by-now view ----
     # Org hourly: baseline hours 0..9 @100 (full 1000); today hours 0..4 @100; cutoff 5
     # -> pace_ratio = 500/1000 = 0.5
-    iu_items = (
-        [{"hour": h, "date": "2026-06-10", "totalTokens": 100, "requests": 1} for h in range(10)]
-        + [{"hour": h, "date": "2026-06-11", "totalTokens": 100, "requests": 1} for h in range(5)]
-    )
+    iu_items = [
+        {"hour": h, "date": "2026-06-10", "totalTokens": 100, "requests": 1}
+        for h in range(10)
+    ] + [
+        {"hour": h, "date": "2026-06-11", "totalTokens": 100, "requests": 1}
+        for h in range(5)
+    ]
     iu_users = [
-        {"name": "甲", "department": "X", "baseline_tokens": 1000, "today_tokens": 200},   # expected 500 -> -60% drop
-        {"name": "乙", "department": "Y", "baseline_tokens": 400, "today_tokens": 600},    # expected 200 -> +200% rise
-        {"name": "丙", "department": "X", "baseline_tokens": 500, "today_tokens": 0},      # silent_today
-        {"name": "丁", "department": "Y", "baseline_tokens": 0, "today_tokens": 300},      # new
+        {
+            "name": "甲",
+            "department": "X",
+            "baseline_tokens": 1000,
+            "today_tokens": 200,
+        },  # expected 500 -> -60% drop
+        {
+            "name": "乙",
+            "department": "Y",
+            "baseline_tokens": 400,
+            "today_tokens": 600,
+        },  # expected 200 -> +200% rise
+        {
+            "name": "丙",
+            "department": "X",
+            "baseline_tokens": 500,
+            "today_tokens": 0,
+        },  # silent_today
+        {
+            "name": "丁",
+            "department": "Y",
+            "baseline_tokens": 0,
+            "today_tokens": 300,
+        },  # new
     ]
     iu = build_intraday_result({"items": iu_items, "cutoff_hour": 5, "users": iu_users})
     check("iu_ratio", iu["pace_ratio"] == 0.5, f"got {iu['pace_ratio']}")
     by_name = {u["name"]: u for u in iu["users"]}
-    check("iu_drop", by_name["甲"]["class"] == "drop" and by_name["甲"]["delta_vs_expected_pct"] == -60.0,
-          f"got {by_name['甲']}")
-    check("iu_rise", by_name["乙"]["class"] == "rise" and by_name["乙"]["delta_vs_expected_pct"] == 200.0,
-          f"got {by_name['乙']}")
-    check("iu_silent", by_name["丙"]["class"] == "silent_today", f"got {by_name['丙']['class']}")
+    check(
+        "iu_drop",
+        by_name["甲"]["class"] == "drop"
+        and by_name["甲"]["delta_vs_expected_pct"] == -60.0,
+        f"got {by_name['甲']}",
+    )
+    check(
+        "iu_rise",
+        by_name["乙"]["class"] == "rise"
+        and by_name["乙"]["delta_vs_expected_pct"] == 200.0,
+        f"got {by_name['乙']}",
+    )
+    check(
+        "iu_silent",
+        by_name["丙"]["class"] == "silent_today",
+        f"got {by_name['丙']['class']}",
+    )
     check("iu_new", by_name["丁"]["class"] == "new", f"got {by_name['丁']['class']}")
     by_dept = {d["department"]: d for d in iu["departments"]}
     # dept X: baseline 1500, expected 750, today 200 -> -73.3%; dept Y: expected 200, today 900 -> +350%
-    check("iu_dept_x", by_dept["X"]["delta_vs_expected_pct"] == -73.3, f"got {by_dept['X']}")
-    check("iu_dept_y", by_dept["Y"]["delta_vs_expected_pct"] == 350.0, f"got {by_dept['Y']}")
-    check("iu_dept_order", iu["departments"][0]["department"] == "X", "drops should sort first")
+    check(
+        "iu_dept_x",
+        by_dept["X"]["delta_vs_expected_pct"] == -73.3,
+        f"got {by_dept['X']}",
+    )
+    check(
+        "iu_dept_y",
+        by_dept["Y"]["delta_vs_expected_pct"] == 350.0,
+        f"got {by_dept['Y']}",
+    )
+    check(
+        "iu_dept_order",
+        iu["departments"][0]["department"] == "X",
+        "drops should sort first",
+    )
     check("iu_estimate_gap", any("估算" in g for g in iu["gaps"]), f"gaps={iu['gaps']}")
     # users_are_windowed=True: baseline IS the window → no pace scaling.
     # 甲 window baseline 500 -> today 200 = -60% drop; 乙 200 -> 600 = +200%.
-    iw = build_intraday_result({"items": iu_items, "cutoff_hour": 5, "users_are_windowed": True, "users": [
-        {"name": "甲", "department": "X", "baseline_tokens": 500, "today_tokens": 200},
-        {"name": "乙", "department": "Y", "baseline_tokens": 200, "today_tokens": 600},
-    ]})
+    iw = build_intraday_result(
+        {
+            "items": iu_items,
+            "cutoff_hour": 5,
+            "users_are_windowed": True,
+            "users": [
+                {
+                    "name": "甲",
+                    "department": "X",
+                    "baseline_tokens": 500,
+                    "today_tokens": 200,
+                },
+                {
+                    "name": "乙",
+                    "department": "Y",
+                    "baseline_tokens": 200,
+                    "today_tokens": 600,
+                },
+            ],
+        }
+    )
     iwu = {u["name"]: u for u in iw["users"]}
-    check("iw_no_scaling", iwu["甲"]["expected_window_tokens"] == 500.0 and iwu["甲"]["delta_vs_expected_pct"] == -60.0,
-          f"got {iwu['甲']}")
+    check(
+        "iw_no_scaling",
+        iwu["甲"]["expected_window_tokens"] == 500.0
+        and iwu["甲"]["delta_vs_expected_pct"] == -60.0,
+        f"got {iwu['甲']}",
+    )
     check("iw_rise", iwu["乙"]["delta_vs_expected_pct"] == 200.0, f"got {iwu['乙']}")
-    check("iw_strict_gap", any("严格同窗" in g for g in iw["gaps"]) and not any("估算口径" in g for g in iw["gaps"]),
-          f"gaps={iw['gaps']}")
-    check("iw_md_caption", "严格同窗" in render_intraday_markdown(iw), "windowed md caption missing")
+    check(
+        "iw_strict_gap",
+        any("严格同窗" in g for g in iw["gaps"])
+        and not any("估算口径" in g for g in iw["gaps"]),
+        f"gaps={iw['gaps']}",
+    )
+    check(
+        "iw_md_caption",
+        "严格同窗" in render_intraday_markdown(iw),
+        "windowed md caption missing",
+    )
     # windowed users covering less than the org window → unattributed disclosure.
     # org baseline window = 500; single user covers 300 → 200 (40%) undisclosed.
-    iw2 = build_intraday_result({"items": iu_items, "cutoff_hour": 5, "users_are_windowed": True, "users": [
-        {"name": "甲", "department": "X", "baseline_tokens": 300, "today_tokens": 100},
-    ]})
-    check("iw2_unattributed", any("未纳入分人视图" in g for g in iw2["gaps"]), f"gaps={iw2['gaps']}")
+    iw2 = build_intraday_result(
+        {
+            "items": iu_items,
+            "cutoff_hour": 5,
+            "users_are_windowed": True,
+            "users": [
+                {
+                    "name": "甲",
+                    "department": "X",
+                    "baseline_tokens": 300,
+                    "today_tokens": 100,
+                },
+            ],
+        }
+    )
+    check(
+        "iw2_unattributed",
+        any("未纳入分人视图" in g for g in iw2["gaps"]),
+        f"gaps={iw2['gaps']}",
+    )
     # iw (users sum 700 > org 500) must NOT emit the disclosure (no positive diff)
-    check("iw_no_false_unattributed", not any("未纳入分人视图" in g for g in iw["gaps"]), f"gaps={iw['gaps']}")
+    check(
+        "iw_no_false_unattributed",
+        not any("未纳入分人视图" in g for g in iw["gaps"]),
+        f"gaps={iw['gaps']}",
+    )
 
     # ---- week_over_week: prior-week days outside the input period are dropped ----
     # Single week fed (6/8-6/12): every prior-week pair predates the period → all
     # dropped, view degrades gracefully with a note instead of a fake +100% WoW.
-    wow_single = build_result({
-        "records": [{"employee": "A", "department": "D", "date": f"2026-06-{d:02d}", "model": "m", "tokens": 100, "requests": 1} for d in range(8, 13)],
-        "period": {"start": "2026-06-08", "end": "2026-06-12"}, "workdays_only": True,
-    })["week_over_week"]
-    check("wow_dropped_all", wow_single["dropped_unmatched_pairs"] == 5 and wow_single["dept_wow_pct"] == 0.0,
-          f"got {wow_single['dropped_unmatched_pairs']} / {wow_single['dept_wow_pct']}")
-    check("wow_dropped_note", "剔除" in (wow_single.get("note") or ""), f"note={wow_single.get('note')}")
+    wow_single = build_result(
+        {
+            "records": [
+                {
+                    "employee": "A",
+                    "department": "D",
+                    "date": f"2026-06-{d:02d}",
+                    "model": "m",
+                    "tokens": 100,
+                    "requests": 1,
+                }
+                for d in range(8, 13)
+            ],
+            "period": {"start": "2026-06-08", "end": "2026-06-12"},
+            "workdays_only": True,
+        }
+    )["week_over_week"]
+    check(
+        "wow_dropped_all",
+        wow_single["dropped_unmatched_pairs"] == 5
+        and wow_single["dept_wow_pct"] == 0.0,
+        f"got {wow_single['dropped_unmatched_pairs']} / {wow_single['dept_wow_pct']}",
+    )
+    check(
+        "wow_dropped_note",
+        "剔除" in (wow_single.get("note") or ""),
+        f"note={wow_single.get('note')}",
+    )
     # main two-full-week dataset: nothing dropped (regression guard)
-    check("wow_none_dropped", result["week_over_week"]["dropped_unmatched_pairs"] == 0,
-          f"got {result['week_over_week']['dropped_unmatched_pairs']}")
+    check(
+        "wow_none_dropped",
+        result["week_over_week"]["dropped_unmatched_pairs"] == 0,
+        f"got {result['week_over_week']['dropped_unmatched_pairs']}",
+    )
 
     # ---- unequal-length weeks flagged in gaps ----
-    partial_wk = build_result({
-        "records": [{"employee": "A", "department": "D", "date": f"2026-06-{d:02d}", "model": "m", "tokens": 100, "requests": 1} for d in [8, 9, 10, 11, 12, 15, 16]],
-        "period": {"start": "2026-06-08", "end": "2026-06-16"}, "workdays_only": True,
-    })
-    check("partial_week_gap", any("不等长" in g for g in partial_wk["gaps"]), f"gaps={partial_wk['gaps']}")
+    partial_wk = build_result(
+        {
+            "records": [
+                {
+                    "employee": "A",
+                    "department": "D",
+                    "date": f"2026-06-{d:02d}",
+                    "model": "m",
+                    "tokens": 100,
+                    "requests": 1,
+                }
+                for d in [8, 9, 10, 11, 12, 15, 16]
+            ],
+            "period": {"start": "2026-06-08", "end": "2026-06-16"},
+            "workdays_only": True,
+        }
+    )
+    check(
+        "partial_week_gap",
+        any("不等长" in g for g in partial_wk["gaps"]),
+        f"gaps={partial_wk['gaps']}",
+    )
     try:
         iumd = render_intraday_markdown(iu)
-        check("iu_md_sections", "分部门" in iumd and "明显下降" in iumd and "今日未使用" in iumd,
-              "intraday md missing dept/drop sections")
+        check(
+            "iu_md_sections",
+            "分部门" in iumd and "明显下降" in iumd and "今日未使用" in iumd,
+            "intraday md missing dept/drop sections",
+        )
     except Exception as exc:  # pragma: no cover
         check("iu_md_no_throw", False, f"render_intraday_markdown(users) threw {exc!r}")
     # empty input must not throw
     try:
         empty_intr = build_intraday_result({})
-        check("intr_empty_gap", any("empty result" in g for g in empty_intr["gaps"]), f"gaps={empty_intr['gaps']}")
+        check(
+            "intr_empty_gap",
+            any("empty result" in g for g in empty_intr["gaps"]),
+            f"gaps={empty_intr['gaps']}",
+        )
     except Exception as exc:  # pragma: no cover
         check("intr_empty_no_throw", False, f"threw {exc!r}")
 
@@ -1221,9 +1587,11 @@ def _selftest() -> int:
             print("  - " + f)
         return 1
     print("PASS")
-    print(f"  checks: dept Δ=-34.6% (down), growth=Alice(+300%), "
-          f"decline=Bob(-100%)+Dave(由活转静), recent-drop=Eve(-90%), "
-          f"weekend/malformed correctly excluded.")
+    print(
+        "  checks: dept Δ=-34.6% (down), growth=Alice(+300%), "
+        "decline=Bob(-100%)+Dave(由活转静), recent-drop=Eve(-90%), "
+        "weekend/malformed correctly excluded."
+    )
     return 0
 
 
@@ -1269,7 +1637,9 @@ def _parse_hour(value: Any) -> int | None:
     return h if 0 <= h <= 23 else None
 
 
-def _intraday_window(series: dict[int, tuple[float, float]], upto: int) -> dict[str, float]:
+def _intraday_window(
+    series: dict[int, tuple[float, float]], upto: int
+) -> dict[str, float]:
     tokens = sum(t for h, (t, _r) in series.items() if h < upto)
     requests = sum(r for h, (_t, r) in series.items() if h < upto)
     return {"tokens": round(tokens, 2), "requests": round(requests, 2)}
@@ -1320,33 +1690,51 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
 
     cutoff_raw = payload.get("cutoff_hour")
     if cutoff_raw is None:
-        hours_today = [h for h, (t, r) in total.get(today, {}).items() if t > 0 or r > 0]
+        hours_today = [
+            h for h, (t, r) in total.get(today, {}).items() if t > 0 or r > 0
+        ]
         cutoff = (max(hours_today) + 1) if hours_today else 24
-        gaps.append(f"cutoff_hour not provided → derived from data as {cutoff:02d}:00 (today's last active hour + 1); pass cutoff_hour explicitly for a wall-clock cut")
+        gaps.append(
+            f"cutoff_hour not provided → derived from data as {cutoff:02d}:00 (today's last active hour + 1); pass cutoff_hour explicitly for a wall-clock cut"
+        )
     else:
         cutoff = max(0, min(24, int(_num(cutoff_raw))))
 
     td, bd = _parse_date(today), _parse_date(baseline)
     if bd is not None and bd.weekday() >= 5:
-        gaps.append(f"baseline {baseline} 是周末——工作日问题建议改用上一个工作日或上周同星期几作基线")
+        gaps.append(
+            f"baseline {baseline} 是周末——工作日问题建议改用上一个工作日或上周同星期几作基线"
+        )
     if td is not None and bd is not None and (td - bd).days != 1:
-        gaps.append(f"baseline 与 today 相差 {(td - bd).days} 天(非昨天)——确认这是有意选择的基线")
+        gaps.append(
+            f"baseline 与 today 相差 {(td - bd).days} 天(非昨天)——确认这是有意选择的基线"
+        )
 
-    def series_block(series: dict[str, dict[int, tuple[float, float]]]) -> dict[str, Any]:
+    def series_block(
+        series: dict[str, dict[int, tuple[float, float]]],
+    ) -> dict[str, Any]:
         tw = _intraday_window(series.get(today, {}), cutoff)
         bw = _intraday_window(series.get(baseline, {}), cutoff)
         bf = _intraday_window(series.get(baseline, {}), 24)
         tf = _intraday_window(series.get(today, {}), 24)
-        projected = round(tw["tokens"] * bf["tokens"] / bw["tokens"], 2) if bw["tokens"] > 0 else None
+        projected = (
+            round(tw["tokens"] * bf["tokens"] / bw["tokens"], 2)
+            if bw["tokens"] > 0
+            else None
+        )
         return {
             "today_window": tw,
             "baseline_window": bw,
             "same_window_delta_pct": _pct_change(bw["tokens"], tw["tokens"]),
-            "same_window_requests_delta_pct": _pct_change(bw["requests"], tw["requests"]),
+            "same_window_requests_delta_pct": _pct_change(
+                bw["requests"], tw["requests"]
+            ),
             "baseline_full_day": bf,
             "naive_partial_vs_full_pct": _pct_change(bf["tokens"], tf["tokens"]),
             "projected_today_full_tokens": projected,
-            "projected_vs_baseline_full_pct": _pct_change(bf["tokens"], projected) if projected is not None else None,
+            "projected_vs_baseline_full_pct": _pct_change(bf["tokens"], projected)
+            if projected is not None
+            else None,
         }
 
     overall = series_block(total)
@@ -1356,7 +1744,9 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
             continue
         block = series_block(cube[name])
         block["series"] = name
-        block["window_delta_tokens"] = round(block["today_window"]["tokens"] - block["baseline_window"]["tokens"], 2)
+        block["window_delta_tokens"] = round(
+            block["today_window"]["tokens"] - block["baseline_window"]["tokens"], 2
+        )
         per_series.append(block)
     per_series.sort(key=lambda b: (-abs(b["window_delta_tokens"]), b["series"]))
 
@@ -1380,18 +1770,32 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
     users_windowed = bool(payload.get("users_are_windowed"))
     if isinstance(raw_users, list) and raw_users:
         if pace_ratio is None and not users_windowed:
-            gaps.append("baseline full-day tokens are 0 → cannot scale expected-by-now; per-user view skipped")
+            gaps.append(
+                "baseline full-day tokens are 0 → cannot scale expected-by-now; per-user view skipped"
+            )
             raw_users = []
         dept_acc: dict[str, dict[str, float]] = {}
         if raw_users:
+            fallback_pace_ratio = pace_ratio if pace_ratio is not None else 0.0
             for u in raw_users:
                 if not isinstance(u, dict):
                     continue
-                name = _str(u.get("name") or u.get("employee") or u.get("user")).strip() or "(unknown)"
-                dept = _str(u.get("department")).strip() or "(未分组)"
-                base_full = _num(u.get("baseline_tokens", u.get("baseline_full_tokens")))
+                name = (
+                    _str(u.get("name") or u.get("employee") or u.get("user")).strip()
+                    or "(unknown)"
+                )
+                dept = _str(u.get("department")).strip()
+                if not _is_assigned_department(dept):
+                    continue
+                base_full = _num(
+                    u.get("baseline_tokens", u.get("baseline_full_tokens"))
+                )
                 today_tokens = _num(u.get("today_tokens", u.get("tokens")))
-                expected = round(base_full, 2) if users_windowed else round(base_full * pace_ratio, 2)
+                expected = (
+                    round(base_full, 2)
+                    if users_windowed
+                    else round(base_full * fallback_pace_ratio, 2)
+                )
                 if base_full <= SILENT_EPSILON and today_tokens > SILENT_EPSILON:
                     klass = "new"
                     delta = None
@@ -1399,49 +1803,79 @@ def build_intraday_result(payload: dict[str, Any]) -> dict[str, Any]:
                     klass = "silent_today"
                     delta = -100.0
                 else:
-                    delta = _pct_change(expected, today_tokens) if expected > SILENT_EPSILON else None
+                    delta = (
+                        _pct_change(expected, today_tokens)
+                        if expected > SILENT_EPSILON
+                        else None
+                    )
                     if delta is not None and delta <= -float(thresholds["drop_pct"]):
                         klass = "drop"
                     elif delta is not None and delta >= float(thresholds["growth_pct"]):
                         klass = "rise"
                     else:
                         klass = "steady"
-                users_out.append({
-                    "name": name,
-                    "department": dept,
-                    "baseline_full_tokens": round(base_full, 2),
-                    "expected_window_tokens": expected,
-                    "today_window_tokens": round(today_tokens, 2),
-                    "delta_vs_expected_pct": delta,
-                    "class": klass,
-                })
+                users_out.append(
+                    {
+                        "name": name,
+                        "department": dept,
+                        "baseline_full_tokens": round(base_full, 2),
+                        "expected_window_tokens": expected,
+                        "today_window_tokens": round(today_tokens, 2),
+                        "delta_vs_expected_pct": delta,
+                        "class": klass,
+                    }
+                )
                 acc = dept_acc.setdefault(dept, {"baseline_full": 0.0, "today": 0.0})
                 acc["baseline_full"] += base_full
                 acc["today"] += today_tokens
             for dept in sorted(dept_acc):
                 acc = dept_acc[dept]
-                d_expected = round(acc["baseline_full"], 2) if users_windowed else round(acc["baseline_full"] * pace_ratio, 2)
-                departments_out.append({
-                    "department": dept,
-                    "baseline_full_tokens": round(acc["baseline_full"], 2),
-                    "expected_window_tokens": d_expected,
-                    "today_window_tokens": round(acc["today"], 2),
-                    "delta_vs_expected_pct": _pct_change(d_expected, acc["today"]) if d_expected > SILENT_EPSILON else None,
-                })
-            departments_out.sort(key=lambda d: (d["delta_vs_expected_pct"] if d["delta_vs_expected_pct"] is not None else 0.0, d["department"]))
+                d_expected = (
+                    round(acc["baseline_full"], 2)
+                    if users_windowed
+                    else round(acc["baseline_full"] * fallback_pace_ratio, 2)
+                )
+                departments_out.append(
+                    {
+                        "department": dept,
+                        "baseline_full_tokens": round(acc["baseline_full"], 2),
+                        "expected_window_tokens": d_expected,
+                        "today_window_tokens": round(acc["today"], 2),
+                        "delta_vs_expected_pct": _pct_change(d_expected, acc["today"])
+                        if d_expected > SILENT_EPSILON
+                        else None,
+                    }
+                )
+            departments_out.sort(
+                key=lambda d: (
+                    d["delta_vs_expected_pct"]
+                    if d["delta_vs_expected_pct"] is not None
+                    else 0.0,
+                    d["department"],
+                )
+            )
             if users_windowed:
-                gaps.append("分部门/个人为严格同窗口径(query_usage hourTo 窗口聚合),与总量同窗一致")
+                gaps.append(
+                    "分部门/个人为严格同窗口径(query_usage hourTo 窗口聚合),与总量同窗一致"
+                )
                 # Disclose usage NOT covered by the per-user list (excluded
                 # unassigned people, truncated rows, unattributed records) so
                 # the org headline and the per-person view reconcile openly.
                 attr_base = sum(u["baseline_full_tokens"] for u in users_out)
                 attr_today = sum(u["today_window_tokens"] for u in users_out)
-                for label, attr, total_tokens in (("基线日", attr_base, overall["baseline_window"]["tokens"]), ("今日", attr_today, overall["today_window"]["tokens"])):
+                for label, attr, total_tokens in (
+                    ("基线日", attr_base, overall["baseline_window"]["tokens"]),
+                    ("今日", attr_today, overall["today_window"]["tokens"]),
+                ):
                     diff = total_tokens - attr
                     if total_tokens > 0 and diff / total_tokens > 0.005:
-                        gaps.append(f"{label}同窗总量 {total_tokens:,.0f} 比分人加总 {attr:,.0f} 多 {diff:,.0f}(约 {diff / total_tokens * 100:.1f}%,未分配人员/未列入用户/未归属记录),未纳入分人视图")
+                        gaps.append(
+                            f"{label}同窗总量 {total_tokens:,.0f} 比分人加总 {attr:,.0f} 多 {diff:,.0f}(约 {diff / total_tokens * 100:.1f}%,未分配人员/未列入用户/未归属记录),未纳入分人视图"
+                        )
             else:
-                gaps.append(f"分部门/个人为估算口径:昨日整日 × 全局进度比 {pace_ratio}(假设各人日内节奏相同),非严格同窗;服务端已支持 hourTo 时请改用严格同窗")
+                gaps.append(
+                    f"分部门/个人为估算口径:昨日整日 × 全局进度比 {pace_ratio}(假设各人日内节奏相同),非严格同窗;服务端已支持 hourTo 时请改用严格同窗"
+                )
 
     return {
         "mode": "intraday",
@@ -1469,38 +1903,70 @@ def render_intraday_markdown(result: dict[str, Any]) -> str:
         f"- 参考·基线日整日: {o['baseline_full_day']['tokens']:,.0f} tokens",
     ]
     if o.get("projected_today_full_tokens") is not None:
-        lines.append(f"- 参考·按今日节奏折算全日(推测): ≈{o['projected_today_full_tokens']:,.0f} tokens,较基线日整日 {o['projected_vs_baseline_full_pct']:+.1f}%")
-    lines.append(f"- ⚠️ 禁止口径·今日累计 vs 基线日整日: {o['naive_partial_vs_full_pct']:+.1f}%(时间窗不等长,不得作结论)")
+        lines.append(
+            f"- 参考·按今日节奏折算全日(推测): ≈{o['projected_today_full_tokens']:,.0f} tokens,较基线日整日 {o['projected_vs_baseline_full_pct']:+.1f}%"
+        )
+    lines.append(
+        f"- ⚠️ 禁止口径·今日累计 vs 基线日整日: {o['naive_partial_vs_full_pct']:+.1f}%(时间窗不等长,不得作结论)"
+    )
     if result["per_series"]:
         lines += ["", "### 分序列同窗变化(按 |Δtokens| 排序)"]
         for b in result["per_series"][:10]:
-            lines.append(f"- {b['series']}: {b['baseline_window']['tokens']:,.0f} → {b['today_window']['tokens']:,.0f}(Δ {b['same_window_delta_pct']:+.1f}%,{b['window_delta_tokens']:+,.0f} tokens)")
+            lines.append(
+                f"- {b['series']}: {b['baseline_window']['tokens']:,.0f} → {b['today_window']['tokens']:,.0f}(Δ {b['same_window_delta_pct']:+.1f}%,{b['window_delta_tokens']:+,.0f} tokens)"
+            )
 
     def _fmt_delta(v: float | None) -> str:
         return f"{v:+.1f}%" if v is not None else "n/a"
 
     if result.get("departments"):
-        dept_caption = "严格同窗(hourTo 窗口聚合)" if result.get("users_windowed") else "昨日整日×进度比=到此刻期望 vs 今日实际,估算"
+        dept_caption = (
+            "严格同窗(hourTo 窗口聚合)"
+            if result.get("users_windowed")
+            else "昨日整日×进度比=到此刻期望 vs 今日实际,估算"
+        )
         lines += ["", f"### 分部门({dept_caption})"]
         for d in result["departments"]:
-            lines.append(f"- {d['department']}: 期望≈{d['expected_window_tokens']:,.0f} vs 实际 {d['today_window_tokens']:,.0f}(Δ {_fmt_delta(d['delta_vs_expected_pct'])})")
+            lines.append(
+                f"- {d['department']}: 期望≈{d['expected_window_tokens']:,.0f} vs 实际 {d['today_window_tokens']:,.0f}(Δ {_fmt_delta(d['delta_vs_expected_pct'])})"
+            )
     users = result.get("users") or []
-    drops = sorted([u for u in users if u["class"] in ("drop", "silent_today")], key=lambda u: (u["delta_vs_expected_pct"] if u["delta_vs_expected_pct"] is not None else -100.0))
-    rises = sorted([u for u in users if u["class"] == "rise"], key=lambda u: -(u["delta_vs_expected_pct"] or 0.0))
+    drops = sorted(
+        [u for u in users if u["class"] in ("drop", "silent_today")],
+        key=lambda u: (
+            u["delta_vs_expected_pct"]
+            if u["delta_vs_expected_pct"] is not None
+            else -100.0
+        ),
+    )
+    rises = sorted(
+        [u for u in users if u["class"] == "rise"],
+        key=lambda u: -(u["delta_vs_expected_pct"] or 0.0),
+    )
     news = [u for u in users if u["class"] == "new"]
     if drops:
         lines += ["", f"### 📉 较期望明显下降({len(drops)} 人)"]
         for u in drops[:8]:
-            tag = "今日未使用" if u["class"] == "silent_today" else f"Δ {_fmt_delta(u['delta_vs_expected_pct'])}"
-            lines.append(f"- {u['name']}·{u['department']}: 期望≈{u['expected_window_tokens']:,.0f} vs 实际 {u['today_window_tokens']:,.0f}({tag})")
+            tag = (
+                "今日未使用"
+                if u["class"] == "silent_today"
+                else f"Δ {_fmt_delta(u['delta_vs_expected_pct'])}"
+            )
+            lines.append(
+                f"- {u['name']}·{u['department']}: 期望≈{u['expected_window_tokens']:,.0f} vs 实际 {u['today_window_tokens']:,.0f}({tag})"
+            )
     if rises:
         lines += ["", f"### 📈 较期望明显上升({len(rises)} 人)"]
         for u in rises[:8]:
-            lines.append(f"- {u['name']}·{u['department']}: 期望≈{u['expected_window_tokens']:,.0f} vs 实际 {u['today_window_tokens']:,.0f}(Δ {_fmt_delta(u['delta_vs_expected_pct'])})")
+            lines.append(
+                f"- {u['name']}·{u['department']}: 期望≈{u['expected_window_tokens']:,.0f} vs 实际 {u['today_window_tokens']:,.0f}(Δ {_fmt_delta(u['delta_vs_expected_pct'])})"
+            )
     if news:
         lines += ["", f"### 🆕 昨日无用量、今日新增({len(news)} 人)"]
         for u in news[:5]:
-            lines.append(f"- {u['name']}·{u['department']}: 今日 {u['today_window_tokens']:,.0f}")
+            lines.append(
+                f"- {u['name']}·{u['department']}: 今日 {u['today_window_tokens']:,.0f}"
+            )
     if result["gaps"]:
         lines += ["", "缺口: " + "; ".join(result["gaps"])]
     return "\n".join(lines)
@@ -1510,16 +1976,26 @@ def render_intraday_markdown(result: dict[str, Any]) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Deterministic 星元 usage-analysis engine (the fact cube).",
     )
-    parser.add_argument("--md", action="store_true",
-                        help="emit a compact markdown digest instead of JSON")
-    parser.add_argument("--intraday", action="store_true",
-                        help="same-time-window today-vs-baseline comparison from hourly rows (query_usage groupBy=hour_day)")
-    parser.add_argument("--selftest", action="store_true",
-                        help="run the built-in synthetic dataset, assert numbers, print PASS/FAIL")
+    parser.add_argument(
+        "--md",
+        action="store_true",
+        help="emit a compact markdown digest instead of JSON",
+    )
+    parser.add_argument(
+        "--intraday",
+        action="store_true",
+        help="same-time-window today-vs-baseline comparison from hourly rows (query_usage groupBy=hour_day)",
+    )
+    parser.add_argument(
+        "--selftest",
+        action="store_true",
+        help="run the built-in synthetic dataset, assert numbers, print PASS/FAIL",
+    )
     args = parser.parse_args(argv)
 
     if args.selftest:
@@ -1534,7 +2010,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.intraday:
             result = build_intraday_result(payload)
             result["gaps"].insert(0, f"STDIN was not valid JSON ({exc}) → empty result")
-            print(render_intraday_markdown(result) if args.md else json.dumps(result, ensure_ascii=False, indent=2))
+            print(
+                render_intraday_markdown(result)
+                if args.md
+                else json.dumps(result, ensure_ascii=False, indent=2)
+            )
             return 0
         result = build_result(payload)
         result["gaps"].insert(0, f"STDIN was not valid JSON ({exc}) → empty result")
@@ -1549,7 +2029,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.intraday:
         result = build_intraday_result(payload)
-        print(render_intraday_markdown(result) if args.md else json.dumps(result, ensure_ascii=False, indent=2))
+        print(
+            render_intraday_markdown(result)
+            if args.md
+            else json.dumps(result, ensure_ascii=False, indent=2)
+        )
         return 0
 
     result = build_result(payload)

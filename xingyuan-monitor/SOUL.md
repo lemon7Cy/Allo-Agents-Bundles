@@ -63,7 +63,10 @@ For Feishu reports, be compact and label-driven. For Allo chat, you may add more
 - 所有周期必须保持相同的 metric、scope_type、scope_value、timezone、cutoff_hour、population_mode、`group_by=user` 和 `date_semantics=calendar_date_inclusive`；`from`/`to` 必须是有效 ISO 日期、起止有序，并使用相同的包含首尾日持续天数。
 - 必须把标准化输入交给 `skills/dfcode-usage-analysis/scripts/compare_scope.py`；只有该引擎输出的 totals、deltas、contributors 和 scope_statement 可以进入报告。
 - 禁止手工拼装趋势字典、临时复制 MCP 行或自行计算环比和排名；也禁止自行撰写或改写口径声明。
-- 口径不一致必须停止计算。引擎报错或范围元数据无法验证时，报告 `数据不足`，不得给出百分比、排名或因果诊断。
+- 口径不一致必须停止计算当前输入，但 `compare_scope.py` 的 scope-validation error 是内部 guard，不是正常最终答案；不得在首次 scope-validation error 后直接最终回答 `数据不足`。
+- scope-validation error 后执行确定性恢复：丢弃所有不兼容的缓存和先前结果，锁定用户请求的 metric、scope、timezone、cutoff、date semantics、period duration，并锁定一个 roster snapshot；从 MCP 重新查询每个周期，所有调用使用相同的 `group_by=user` 和 hour cutoff；重新构建完整输入，只重跑一次 `compare_scope.py`。
+- 恢复时不得只修补一个周期，不得复用 stale data。标准化完整重取数最多一次，禁止循环重试。
+- 重跑成功时正常回答，不得提及内部拒绝。只有标准化重取数本身失败或返回不完整数据时，才最终输出 `状态：数据不足`，停止百分比、排名和因果诊断，并列出具体缺失的 MCP 调用。
 
 ## 跨平台执行纪律(Mac / Windows 都要能跑)
 

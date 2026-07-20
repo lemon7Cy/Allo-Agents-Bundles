@@ -10,6 +10,9 @@ DESIGN = (
     ROOT
     / "docs/superpowers/specs/2026-07-20-xingyuan-comparison-scope-consistency-design.md"
 )
+PLAN = (
+    ROOT / "docs/superpowers/plans/2026-07-20-xingyuan-comparison-scope-consistency.md"
+)
 
 
 class XingyuanScopeContractTests(unittest.TestCase):
@@ -18,6 +21,7 @@ class XingyuanScopeContractTests(unittest.TestCase):
         cls.soul = SOUL.read_text(encoding="utf-8")
         cls.skill = SKILL.read_text(encoding="utf-8")
         cls.design = DESIGN.read_text(encoding="utf-8")
+        cls.plan = PLAN.read_text(encoding="utf-8")
 
     def test_soul_requires_engine_and_forbids_ad_hoc_trend_dictionaries(self):
         for phrase in (
@@ -44,15 +48,59 @@ class XingyuanScopeContractTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.skill)
 
-    def test_contract_has_hard_failure_response_and_provisioned_engine(self):
-        for phrase in (
-            "状态：数据不足",
-            "诊断：当前周期口径不一致，已停止计算环比。",
-            "缺口：需要使用同一范围、同一固定人员集合和同一截止时间重新取数。",
-        ):
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.skill)
+    def test_contract_has_bounded_full_requery_recovery_and_provisioned_engine(self):
+        required = (
+            "内部 guard",
+            "丢弃所有不兼容的缓存和先前结果",
+            "锁定用户请求的 metric、scope、timezone、cutoff、date semantics、period duration",
+            "一个 roster snapshot",
+            "从 MCP 重新查询每个周期",
+            "相同的 `group_by=user` 和 hour cutoff",
+            "重新构建完整输入",
+            "只重跑一次 `compare_scope.py`",
+            "不得只修补一个周期",
+            "不得复用 stale data",
+            "成功时正常回答，不得提及内部拒绝",
+            "标准化完整重取数最多一次",
+        )
+        for document in (self.soul, self.skill):
+            for phrase in required:
+                with self.subTest(document=document[:20], phrase=phrase):
+                    self.assertIn(phrase, document)
         self.assertTrue(ENGINE.is_file())
+
+    def test_data_insufficient_is_only_after_standardized_requery_data_failure(self):
+        for document in (self.soul, self.skill):
+            for phrase in (
+                "标准化重取数本身失败或返回不完整数据",
+                "状态：数据不足",
+                "列出具体缺失的 MCP 调用",
+            ):
+                with self.subTest(document=document[:20], phrase=phrase):
+                    self.assertIn(phrase, document)
+
+    def test_validation_error_must_not_immediately_become_final_data_insufficient(self):
+        forbidden = "validation error => immediate final 数据不足"
+        for document in (self.soul, self.skill, self.design, self.plan):
+            with self.subTest(document=document[:20]):
+                self.assertNotIn(forbidden, document)
+        for document in (self.soul, self.skill):
+            self.assertIn(
+                "不得在首次 scope-validation error 后直接最终回答 `数据不足`", document
+            )
+
+    def test_design_and_plan_accept_recovery_loop(self):
+        for document in (self.design, self.plan):
+            for phrase in (
+                "one standardized full re-query maximum",
+                "discard all incompatible cached or previous results",
+                "re-query every period from MCP",
+                "do not patch only one period",
+                "successful retry is answered normally without mentioning the internal rejection",
+                "concrete missing MCP calls",
+            ):
+                with self.subTest(document=document[:20], phrase=phrase):
+                    self.assertIn(phrase, document)
 
     def test_skill_distinguishes_generic_usage_from_explicit_request_count(self):
         for phrase in (

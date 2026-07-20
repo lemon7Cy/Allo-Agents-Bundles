@@ -39,6 +39,8 @@
 - [ ] Write contract tests requiring fixed roster snapshots, deterministic engine use, no manually assembled trend dictionaries, and hard failure on inconsistent scope.
 - [ ] Run the contract test and confirm it fails against the current documents.
 - [ ] Add the hard execution rules, exact engine invocation, normalized input contract, and rejected-input response template.
+- [ ] Document that validation rejection is an internal guard: discard all incompatible cached or previous results, lock the requested scope contract and one roster snapshot, re-query every period from MCP, rebuild the full input, and rerun exactly once.
+- [ ] Add contract tests for one standardized full re-query maximum, do not patch only one period, no stale-data reuse, successful retry is answered normally without mentioning the internal rejection, and concrete missing MCP calls only after re-query failure or incomplete data.
 - [ ] Run both Xingyuan test modules and confirm they pass.
 
 ### Task 4: Verify and deliver canonical bundle
@@ -52,6 +54,8 @@
 - [ ] Run `python3 -m unittest discover -s tests -p 'test_*.py' -v`, `python3 -m py_compile xingyuan-monitor/skills/dfcode-usage-analysis/scripts/compare_scope.py`, and `git diff --check`.
 - [ ] Review the branch diff against `origin/main` and ensure it contains only Xingyuan scope-consistency files and design/plan documentation.
 - [ ] Commit, push to the configured fork if upstream is read-only, and open a PR to `wbz0429/Allo-Agents-Bundles:main`.
+
+Canonical acceptance criteria: discard all incompatible cached or previous results and re-query every period from MCP under one locked contract; one standardized full re-query maximum; do not patch only one period or reuse stale data; successful retry is answered normally without mentioning the internal rejection; only a failed or incomplete standardized re-query may produce `数据不足`, with concrete missing MCP calls.
 
 ### Task 5: Synchronize Allo web vendored bundle
 

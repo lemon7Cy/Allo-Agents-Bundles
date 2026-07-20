@@ -55,12 +55,12 @@ The user's department or project term may be abbreviated, omit suffixes such as 
 - At the end of the conclusion, declare the scope in one line, e.g.: `口径:仅已分配部门(已排除未分配人员)。用量以 token 计。`
 - ⚠️ Don't list someone or suggest assigning them just because an unassigned person has high usage — **high usage but unassigned = still excluded**; at most summarize it in the gaps section with one line "另有未分配人员用量未纳入", without naming names.
 
-## 2. Metric Definition: usage = tokens, not request count
+## 2. 指标定义:按用户问题固定 metric
 
-- **Rankings, comparisons, and "high-usage users" are always based on token consumption.**
-- **Request count ≠ usage.** Many requests but low tokens = high-frequency small requests (possibly scripts/polling/autocomplete scenarios), **not a high-usage user**.
-- Mention request count only as a supporting signal when explaining "call patterns", **never as the basis for usage ranking**, and by default don't highlight it in the conclusion.
-- If someone has high request count but very low tokens, **proactively flag** this as "高频低耗" (high-frequency, low-consumption), correcting the misjudgment that "they're a high-usage user".
+- 通用“用量”问题默认使用 `tokens`，此时排名、对比和“高用量用户”均以 token 消耗为准。
+- 明确询问请求次数时允许使用 `requests` 进行对比和排名；报告必须称为“请求次数”，不得称为“用量”或“高用量”。
+- **请求次数 ≠ token 用量。** 请求多但 token 低 = 高频小请求(可能是脚本/轮询/补全场景)，不能据此称为高用量用户。
+- 一次对比只能选择 `requests` 或 `tokens` 之一，所有周期必须保持同一 metric，不能混排或混算。
 
 ## 3. Comparison Methodology: control variables (a pitfall the team lead hit hard)
 
@@ -74,6 +74,74 @@ Before any comparison, **first ask: which variable am I holding fixed?** Only tw
 - Comparing "a department's total" against "one person's usage" — **inconsistent granularity**.
 - Mixing scopes: token vs. request count, including vs. excluding non-staff (编外), different-length time windows.
 - **"Today's partial accumulation" vs "yesterday's FULL day"** — window length AND date both moved. This can even **flip the sign** of the conclusion (real incident: naive read −31.9% "明显下降" while the same-window truth was **+4.8% up**). See §3b — the same-window comparison is **your job, one call away; never hand "按同一时间点再复核" back to the user.**
+
+### 3.1 确定性同口径引擎(强制)
+
+- 每次对比只允许一个 `fixed_roster_snapshot`。从 roster 中标准化部门和在职状态，排除 `未设置`、空部门、占位部门、非员工和跨部门成员后，固定人员集合不再随周期变化。
+- 所有成员连接必须使用 stable user_id；姓名只作展示，重名或改名不能影响归属。固定集合中的用户在某周期没有 usage row 时按 0 处理。
+- comparison 和每个周期都必须显式携带并匹配 `metric、scope_type、scope_value、timezone、cutoff_hour、population_mode、group_by、date_semantics`。`group_by` 必须为 `user`，`date_semantics` 必须为 `calendar_date_inclusive`；各周期 `from`/`to` 必须是 ISO 日期、起止有序且包含首尾日的持续天数相同。先验证全部周期，再计算 totals、deltas、百分比和 contributors。
+- 周期必须按时间严格递增、互不重叠且 label 唯一；输入顺序就是顺序比较和 delta 的时间顺序，不得自动重排。
+- 请求次数问题使用 `metric=requests`；token 用量问题使用 `metric=tokens`。一旦选定，所有周期必须一致。
+- `requests` 行值必须是非负整数且不能是 bool；`tokens` 行值可以是非负有限整数或浮点数。整数聚合必须保持 Python 整数精度，不得先转 float。
+- Internally, token values are normalized to Decimal：整数使用 `Decimal(value)`，浮点数使用 `Decimal(str(value))`；聚合、contributors delta 和 percentage 全程使用 Decimal。JSON 输出中，integral Decimal -> JSON integer 仅限 safely serializable under Python's integer digit limit，otherwise plain decimal string；non-integral Decimal -> finite plain decimal string，并保证 no exponent、`Infinity` 或 `NaN`。
+- CLI 使用 `json.load` 的 parse_int hook：合理长度的数字字面量保持 `int`，超过 Python 整数数字限制的字面量解析为 `Decimal`。实现 must not change the global integer digit limit；metadata 整数仍为 `int`，超限 requests 因不是普通 `int` 而拒绝。
+- `percent` 对所有非零基线输出 finite decimal string，固定 two decimal places（例如 `"-20.00"`、`"66.67"`）；zero baseline remains null。不得输出 JSON `Infinity`、`-Infinity` 或 `NaN`。
+- 不得手工拼装 trend dictionary，不得将 MCP 行复制到临时字典后自行求和、排名或写“同口径”结论。
+- 标准化 JSON 写入临时输入文件后，精确调用：`python3 skills/dfcode-usage-analysis/scripts/compare_scope.py <input.json>`。
+- CLI 成功时 stdout 是结构化 JSON；必须原样输出引擎的 `scope_statement`。CLI 非零退出时 stderr 是有界结构化错误，必须停止当前计算。
+
+### 3.2 scope-validation 确定性恢复循环（强制）
+
+- `compare_scope.py` 的 scope-validation error 是内部 guard，不是正常最终答案；不得在首次 scope-validation error 后直接最终回答 `数据不足`。
+- 收到 scope-validation error 后，丢弃所有不兼容的缓存和先前结果；锁定用户请求的 metric、scope、timezone、cutoff、date semantics、period duration，并锁定一个 roster snapshot。
+- 从 MCP 重新查询每个周期，每个周期都必须使用相同的 `group_by=user` 和 hour cutoff；重新构建完整输入，只重跑一次 `compare_scope.py`。
+- 不得只修补一个周期，不得复用 stale data，也不得把首次被拒绝输入中的行混入新输入。标准化完整重取数最多一次，防止无限重试。
+- 重跑成功时正常回答，不得提及内部拒绝，也不得把恢复过程暴露为用户可见告警。
+- 只有标准化重取数本身失败或返回不完整数据时，才使用 `状态：数据不足`；此时不得输出百分比、排名或因果判断，并在“缺口”中列出具体缺失的 MCP 调用（工具名、周期及缺失字段或失败原因）。
+
+标准化输入合同：
+
+```json
+{
+  "comparison": {
+    "metric": "requests",
+    "scope_type": "department",
+    "scope_value": "智能视迅",
+    "timezone": "Asia/Shanghai",
+    "cutoff_hour": 18,
+    "population_mode": "fixed_roster_snapshot",
+    "group_by": "user",
+    "date_semantics": "calendar_date_inclusive"
+  },
+  "roster": [
+    {"user_id": "user_x", "name": "张三", "department": "智能视迅", "employment_status": "active"}
+  ],
+  "periods": [
+    {
+      "label": "2026-07-13",
+      "from": "2026-07-13",
+      "to": "2026-07-13",
+      "metric": "requests",
+      "scope_type": "department",
+      "scope_value": "智能视迅",
+      "timezone": "Asia/Shanghai",
+      "cutoff_hour": 18,
+      "population_mode": "fixed_roster_snapshot",
+      "group_by": "user",
+      "date_semantics": "calendar_date_inclusive",
+      "rows": [{"user_id": "user_x", "requests": 120}]
+    }
+  ]
+}
+```
+
+标准化完整重取数已执行一次，但重取数本身失败或返回不完整数据时，才使用以下模板；首次口径校验失败不得直接使用：
+
+```text
+状态：数据不足
+诊断：标准化完整重取数失败或数据不完整，已停止计算环比。
+缺口：<列出具体缺失的 MCP 调用、对应周期、缺失字段或失败原因>。
+```
 
 ## 3b. Intraday Iron Rule: "today vs yesterday" MUST be same-time-window (你算,不是用户算)
 
@@ -154,18 +222,18 @@ When a department's usage changes, answer along this chain:
 - **`query_employee_portal_stats` 已知缺陷**: its range parameter is ignored (always month-to-date) and the 365-day heatmap returns empty — near month-start it cannot confirm a sustained decline. Use `query_usage {groupBy:"user_day", userId}` for a per-person daily trend instead.
 - **`query_departments` range** accepts only `today/7d/month/custom` — anything else (e.g. "14d") is **silently degraded**; always use `range:"custom"+from/to` for arbitrary windows and check the echoed `range.from`. Its `wowGrowthPercent` can be null — compute WoW from `previousTokens` yourself, and note the 7d window is 8-calendar-days vs prior 7 (asymmetric).
 
-## 6. Output Template (department usage comparison questions)
+## 6. 输出模板(同口径对比类问题)
 
 ```
-结论:<部门> 近 <周期> token 环比 <涨/跌 X%>,主因是 <主力轮换 / 谁降了 / 谁升了>。
+结论:<范围> 近 <周期> 的 <metric> 环比 <涨/跌 X%>,主因是 <主力轮换 / 谁降了 / 谁升了>。
 
-变化拆解(同部门,同口径):
-- <人/模型A>:<tokenA> → <tokenB>（Δ<±X>）
+变化拆解(同范围,同口径):
+- <人/模型A>:<metricA> → <metricB>（Δ<±X>）
 - <人/模型B>:...
-（只列 token 变化最大的 3-5 项;请求次数如异常另起一行点出"高频低耗"）
+（只列所选 metric 变化最大的 3-5 项）
 
 判断:<主力轮换 / 真实下降>，依据 <…>。
-口径:仅已分配部门，排除未分配/编外人员；用量以 token 计。
+<原样输出引擎的 scope_statement>
 缺口:<数据不全/周期过短等，如有>
 ```
 

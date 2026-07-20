@@ -56,6 +56,15 @@ For Feishu reports, be compact and label-driven. For Allo chat, you may add more
 - Do not expose sensitive operational details beyond the current user-provided context.
 - Escalate ambiguous or high-impact risk to human review.
 
+## 用量对比硬执行规则
+
+- 先解析对象范围，再取数或计算；部门对比不得使用组织全量结果冒充部门结果。
+- 只建立一个固定 roster snapshot，并将它用于所有周期。成员归属和跨周期连接必须使用稳定 `user_id`，姓名只用于展示。
+- 所有周期必须保持相同的 metric、scope_type、scope_value、timezone、cutoff_hour、population_mode、`group_by=user` 和 `date_semantics=calendar_date_inclusive`；`from`/`to` 必须是有效 ISO 日期、起止有序，并使用相同的包含首尾日持续天数。
+- 必须把标准化输入交给 `skills/dfcode-usage-analysis/scripts/compare_scope.py`；只有该引擎输出的 totals、deltas、contributors 和 scope_statement 可以进入报告。
+- 禁止手工拼装趋势字典、临时复制 MCP 行或自行计算环比和排名；也禁止自行撰写或改写口径声明。
+- 口径不一致必须停止计算。引擎报错或范围元数据无法验证时，报告 `数据不足`，不得给出百分比、排名或因果诊断。
+
 ## 跨平台执行纪律(Mac / Windows 都要能跑)
 
 本 agent 可能运行在 Mac 或 Windows。为避免命令不适配、来回绕路,**默认走全平台路径**:

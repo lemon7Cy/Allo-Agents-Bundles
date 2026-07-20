@@ -1,0 +1,86 @@
+{
+  "comparison": {
+    "metric": "requests",
+    "scope_type": "department",
+    "scope_value": " 智能视迅 ",
+    "timezone": "Asia/Shanghai",
+    "cutoff_hour": 18,
+    "population_mode": "fixed_roster_snapshot",
+    "group_by": "user",
+    "date_semantics": "calendar_date_inclusive"
+  },
+  "roster": [
+    {"user_id": "u-001", "name": "张三", "department": "智能视迅", "employment_status": "active"},
+    {"user_id": "u-002", "name": "同名用户", "department": " 智能视迅 ", "employment_status": "staff"},
+    {"user_id": "u-003", "name": "同名用户", "department": "智能视迅", "employment_status": "在职"},
+    {"user_id": "u-004", "name": "未设置用户", "department": "未设置", "employment_status": "active"},
+    {"user_id": "u-005", "name": "空部门用户", "department": "", "employment_status": "active"},
+    {"user_id": "u-006", "name": "占位用户", "department": "maas-migration-smoke", "employment_status": "active"},
+    {"user_id": "u-007", "name": "外包用户", "department": "智能视迅", "employment_status": "contractor"},
+    {"user_id": "u-008", "name": "跨部门用户", "department": "系统部", "employment_status": "active"},
+    {"user_id": "u-009", "name": "配电用户", "department": "配电部", "employment_status": "active"}
+  ],
+  "periods": [
+    {
+      "label": "2026-06-29",
+      "from": "2026-06-29",
+      "to": "2026-06-29",
+      "metric": "requests",
+      "scope_type": "department",
+      "scope_value": "智能视迅",
+      "timezone": "Asia/Shanghai",
+      "cutoff_hour": 18,
+      "population_mode": "fixed_roster_snapshot",
+      "group_by": "user",
+      "date_semantics": "calendar_date_inclusive",
+      "rows": [
+        {"user_id": "u-001", "name": "张三旧名", "requests": 100},
+        {"user_id": "u-002", "name": "完全不同的显示名", "requests": 50},
+        {"user_id": "u-004", "requests": 900},
+        {"user_id": "u-008", "requests": 800}
+      ]
+    },
+    {
+      "label": "2026-07-06",
+      "from": "2026-07-06",
+      "to": "2026-07-06",
+      "metric": "requests",
+      "scope_type": "department",
+      "scope_value": " 智能视迅 ",
+      "timezone": "Asia/Shanghai",
+      "cutoff_hour": 18,
+      "population_mode": "fixed_roster_snapshot",
+      "group_by": "user",
+      "date_semantics": "calendar_date_inclusive",
+      "rows": [
+        {"user_id": "u-001", "requests": 80},
+        {"user_id": "u-003", "name": "同名用户", "requests": 40},
+        {"user_id": "u-005", "requests": 700},
+        {"user_id": "u-006", "requests": 600},
+        {"user_id": "u-007", "requests": 500}
+      ]
+    },
+    {
+      "label": "2026-07-13",
+      "from": "2026-07-13",
+      "to": "2026-07-13",
+      "metric": "requests",
+      "scope_type": "department",
+      "scope_value": "智能视迅",
+      "timezone": "Asia/Shanghai",
+      "cutoff_hour": 18,
+      "population_mode": "fixed_roster_snapshot",
+      "group_by": "user",
+      "date_semantics": "calendar_date_inclusive",
+      "rows": [
+        {"user_id": "u-001", "requests": 110},
+        {"user_id": "u-002", "requests": 70},
+        {"user_id": "u-003", "requests": 20},
+        {"user_id": "u-004", "requests": 1000},
+        {"user_id": "u-008", "requests": 900},
+        {"user_id": "u-009", "requests": 800},
+        {"user_id": "unknown-user", "requests": 750}
+      ]
+    }
+  ]
+}

@@ -11,7 +11,7 @@
     "env": {
       "X-API-Key": "$DFCODE_API_KEY"
     },
-    "url": "http://119.45.112.196/mcp/sse"
+    "url": "http://221.0.79.252/mcp/sse"
   },
   "tools": [
     {

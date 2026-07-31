@@ -129,6 +129,15 @@ def _optional_doi(value: object, field: str) -> str | None:
     return text
 
 
+def _contains_exact_doi(text: str, doi: str) -> bool:
+    decoded = unquote(text)
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9]){re.escape(doi)}(?=$|[/?#&\s，。；：、）)\]])",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(decoded))
+
+
 def _validate_payload(payload: object) -> dict:
     if not isinstance(payload, dict):
         raise ValidationError("input must be a JSON object")
@@ -187,9 +196,14 @@ def _validate_payload(payload: object) -> dict:
             validation_errors.append(f"{item_label}: {exc}")
             doi = None
         official_url = _required_text(raw.get("official_url"), f"items[{index}].official_url", max_length=1000)
-        if doi and doi.casefold() not in unquote(official_url).casefold():
+        doi_visible_in_url = bool(doi and _contains_exact_doi(official_url, doi))
+        doi_visible_in_fact = bool(
+            doi
+            and any("doi" in fact.casefold() and _contains_exact_doi(fact, doi) for fact in clean_facts)
+        )
+        if doi and not (doi_visible_in_url or doi_visible_in_fact):
             validation_errors.append(
-                f"{item_label} DOI must appear literally in official_url; use a DOI resolver/publisher URL containing it or set DOI to null"
+                f"{item_label} DOI must appear as an exact identifier in the exact opened official_url or in a `页面显示 DOI：...` fact; preserve official_url exactly and set DOI to null if the fetched page did not show it"
             )
 
         items.append(

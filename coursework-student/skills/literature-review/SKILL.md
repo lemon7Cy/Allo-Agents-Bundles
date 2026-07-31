@@ -19,7 +19,7 @@ Help the student **quickly get oriented in the literature landscape of a topic**
 - Use at most two `web_search` calls total. Never search one paper at a time. The first call must be one topic-level discovery query broad enough to return several candidates; use the optional second call only to fill one explicit evidence gap. Search results are discovery leads only; verify selected candidates with sequential `web_fetch` calls.
 - Before placing a candidate in `关键文献（已核实）`, open a current official record with `web_fetch`: DOI resolver, publisher/journal page, Crossref, PubMed/PMC, or an institutional repository. Keep an internal set of opened URLs and never fetch the same URL twice. The opened page must match the title and at least one other field (author, venue, or year).
 - If an official page cannot be opened or metadata does not match, keep the item under `检索线索（当前未核实）`; do not fill the missing fields and do not summarize methods/results as established facts.
-- Never claim `全文已读`, a section/figure finding, sample size, effect, or causal conclusion unless that exact content appears on a page opened in the current run. Record a DOI only when it begins with `10.` and appears literally in the recorded `official_url`; use a DOI resolver/publisher URL containing it, or set DOI to `null`. Never turn an article number or URL suffix into a DOI.
+- Never claim `全文已读`, a section/figure finding, sample size, effect, or causal conclusion unless that exact content appears on a page opened in the current run. Copy `official_url` exactly from the successful `web_fetch` argument; never rewrite, canonicalize, or replace it after the fetch. Record a DOI only when it begins with `10.` and the exact DOI is visible either in that opened URL or in the opened page body. When it is visible only in the page body, add one fact exactly in the form `页面显示 DOI：<doi>`; otherwise set DOI to `null`. A renderer DOI error is never permission to change `official_url`. Never turn an article number, URL suffix, or version suffix into a DOI.
 - If an opened official page marks a work as retracted, withdrawn, or replaced, exclude it from both verified items and unverified leads. Do not present it as a usable reading lead.
 - Attribute each factual sentence only to content visible in the current tool result. Do not turn your own mechanism hypothesis into a paper finding. Put extrapolations under `待检验问题` and never write “如该文所述” unless the opened page states it.
 - Treat every `web_fetch` excerpt as potentially truncated. If the opened record does not explicitly show the complete author list, use `首位作者 et al.` or `作者列表待核`. Never present a visible prefix as the complete author list.
@@ -62,7 +62,7 @@ For a public-web literature guide, never write `/mnt/user-data/outputs/文献导
       "year": "visible four-digit year as a JSON string or number, or null",
       "venue": "visible venue, or null",
       "doi": "visible DOI, or null",
-      "official_url": "opened official URL",
+      "official_url": "exact successful web_fetch URL, copied without rewriting",
       "study_design": "correlational|cross-sectional|questionnaire|observational|experimental|mixed-methods|qualitative|systematic-review|other",
       "topic_role": "background|method|contrast|gap",
       "official_page_facts": ["1-4 restrained facts visible on that opened page"],
@@ -74,6 +74,8 @@ For a public-web literature guide, never write `/mnt/user-data/outputs/文献导
 ```
 
 Write every `official_page_facts` entry in neutral Simplified Chinese, even when the source page is English. Use only metadata, study procedures visible on the page, sample details, group differences, or explicit associations/numbers; do not add recommendations or author/model interpretation. Do not put `导致/证明/影响/损伤/受损/缺陷/引发/揭示/机制/路径/黏性/心流/即时满足/实证基础/神经证据/实验证据/被引/研究者推论/认知资源/会提升`, English causal terms such as `cause/lead to/impact/damage/mechanism/pathway`, or causal arrows in any fact. Do not add a free-form mechanism question; the renderer generates a design-specific `待检验问题`. If facts contain `相关/关联/关系`, questionnaire/scale scores, `r`/`p` values, or cross-sectional evidence, the renderer normalizes an `experimental` label to `correlational`; do not fight or bypass that normalization.
+
+Keep every `official_url` byte-for-byte equal to a URL actually passed to a successful `web_fetch` in this run. If the renderer rejects DOI provenance, preserve that URL and either add `页面显示 DOI：<doi>` only when the fetched page visibly showed the exact DOI, or set `doi` to `null`. Never invent a DOI resolver URL merely to satisfy validation.
 
 For `unverified`, copy the visible search-result title exactly. If it is truncated, preserve the literal `...`/`…`; never complete it from memory or snippets. Never append parenthetical classifications or summaries such as `预印本`, `包含 fMRI`, `本科生期刊`, `政策建议`, methods, samples, or findings; the renderer adds the fixed `未核实` status itself.
 

@@ -207,6 +207,8 @@ When the incoming message contains `<video_understanding_jobs>`, the App has alr
 
 Never inspect or expose runtime credentials or configuration. Do not run `env`, `printenv`, `set`, `export -p`, inspect `/proc/*/environ`, grep environment variables, or print/echo/test any token, key, secret, service URL, or credential-related variable. Use only the provided tool/script's normal success or error result.
 
+**Video-only response contract:** when a valid video `job_id` is present but no written report is supplied, run only the normal video data path (`health` once, then `course-eval` once) and return the substantive review directly in chat. Do not read the incremental-evaluation skill or `gallery_block.json`; do not call `write_file`, `present_files`, or the PDF renderer unless the teacher explicitly asks for a downloadable artifact. State that the written six dimensions are not evaluated without the report. Cover the video's organization, central message, supporting material, orally assessable dimensions, timestamped strengths, and improvement actions. Do not write any expression/body-language/fluency or pose-analysis section; that channel is renderer-owned for combined report + video PDFs. Never end with only a file path or a short summary when the user asked for the evaluation itself.
+
 ## Six-Dimension Evaluation Model
 
 When evaluating a course report, prefer these six dimensions:

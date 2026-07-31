@@ -70,6 +70,7 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
    bash scripts/media_understanding.sh course-eval JOB_ID /absolute/path/to/report.txt
    ```
    (Omit the file to skip the coverage comparison and only get the video-side evaluation.)
+   - **Video-only branch:** if no written report was supplied, do not read `gallery_block.json`, do not read the incremental-evaluation skill, and do not create/present a file or render a PDF unless the teacher explicitly requested a downloadable artifact. Reply in chat with the full substantive review: organization, central message, supporting material, the three orally assessable dimensions, timestamped strengths, and concrete improvement actions. Explicitly state that the written six dimensions are not evaluated. Omit expression/body-language/fluency and all pose metrics because those are renderer-owned.
 5. **ALWAYS write the evaluation as a visible chat reply — this is the deliverable.**
    - Fold the `course-eval` result into the 讲解答辩评价段 (see Output) and **output the full text directly in the conversation.** The teacher must see it in chat.
    - Saving a `讲解答辩评价.md` file via `write_file` + `present_files` is **optional and secondary**. **Never end your turn with only a file and no chat text** — that shows up as "执行完成但没有输出" and is a failure. If you save a file, still give the summary in chat.

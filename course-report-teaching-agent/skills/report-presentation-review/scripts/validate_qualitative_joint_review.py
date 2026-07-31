@@ -19,6 +19,7 @@ BANNED_LITERALS = (
     "至少", "不少于", "若干", "多项", "多个", "多处", "几项", "几处", "一系列",
     "一张", "一条", "各补", "各增加", "各添加", "必须", "严重", "最薄弱",
     "偏高", "偏低", "过高", "过低",
+    "两位数", "基本预期", "口头表达", "流畅度", "语速", "肢体", "姿态",
     "✅", "❌", "⚠️", "covered", "thin", "absent", "partial",
 )
 QUALITATIVE_ONLY_LITERALS = ("评分", "得分", "雷达", "PDF", "导出")
@@ -95,6 +96,10 @@ def main() -> int:
     for literal in BANNED_LITERALS + QUALITATIVE_ONLY_LITERALS:
         if literal.casefold() in draft.casefold():
             issues.append({"kind": "banned_literal", "value": literal})
+
+    boundary_sentence = "视频只补充口头与覆盖证据，不改变对书面报告的判断。"
+    if boundary_sentence not in draft:
+        issues.append({"kind": "missing_written_judgment_boundary", "value": boundary_sentence})
 
     for pattern in UNSUPPORTED_EXTERNAL_PATTERNS:
         for match in pattern.finditer(draft):

@@ -1,38 +1,65 @@
 ---
 name: incremental-evaluation
-description: 'Read this skill when the user wants to "review a course report," "score on the six dimensions," "compare the first draft and final draft," or "generate an incremental evaluation / radar chart." It turns the six-dimension evaluation from "just talk" into something "visualized and verifiable" — you (the LLM) score each draft on the six dimensions per the rubric and write the justification, while the script draws the radar chart and computes the increments. The core is incremental evaluation: it looks at the real improvement from first draft to final draft (sidestepping "was this written by AI").'
+description: 'Compare a course-report first draft and final draft, or run an explicitly requested quantitative six-dimension evaluation. Default to a qualitative, evidence-based comparison without scores. Produce six numeric scores and a radar chart only when the teacher explicitly asks for scoring, quantification, or a radar, or supplies a rubric that requires numeric scores.'
 ---
 
-# Six-Dimension Incremental Evaluation
+# Draft-to-Final Incremental Evaluation
 
 ## What this skill solves
-This skill compares **observable changes from first draft → final draft** rather than relying only on the polish of a single product. A strong increment is one backed by concrete changes in decisions, evidence, methods, analysis, citation closure, boundaries, and reflection. A language-only change is reported as language improvement, not automatically as deeper learning. The teacher retains the judgment about the learner.
 
-## Division of responsibility (hard rules)
-- **You (the LLM) make the judgment**: read the drafts, score **each draft** 0–100 on the six-dimension rubric below, and write one sentence of **justification** per dimension. Judgments must be grounded — distinguish "supported by evidence," "reasonable inference," and "pending teacher confirmation"; do not fabricate when material is missing.
-- **The script handles visualization**: the radar chart + increment table are produced by `scripts/render_eval.py`; **do not draw charts yourself with text**.
-- **Teacher authority**: you only provide a reference evaluation; you do not replace the teacher's official grade.
+This skill compares **observable changes from first draft to final draft**. A strong increment is backed by concrete changes in decisions, evidence, methods, analysis, citation closure, boundaries, and reflection. A language-only change is reported as expression improvement, not automatically as deeper learning. The teacher retains the final judgment.
 
-## Six-dimension rubric (metric library)
-The six dimensions = **创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性**.
-**Before scoring you must read `rubric.md` in this skill's directory** — it has the 0–100 band anchors for each dimension (weak/medium/strong, taken from real samples), plus **6 deep-read hard-deduction items** (data authenticity ↔ conclusion consistency, citation closure, figure-number continuity, cross-section numerical self-consistency, relative vs. absolute metrics, correctness of the evaluation baseline) and difficulty-tiering rules. **Scoring off the top of your head without reading the rubric is not allowed.**
+## Choose the mode first
 
-## Evidence boundary for technical judgments
+### Qualitative comparison (default)
+
+Use this when the user asks to compare, review, diagnose, or comment without explicitly requesting numeric scores.
+
+- Read both drafts across text, formulas, figures, code, and tables.
+- Compare the six canonical dimensions when relevant: 创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性.
+- For each dimension, state the initial evidence, final evidence, observable change, and remaining gap.
+- Do **not** create numeric scores, a scorecard, a benchmark, `scores.json`, or a radar chart.
+- A single-draft review is also qualitative by default.
+
+### Quantitative six-dimension comparison (explicit request only)
+
+Use this only when the user explicitly asks to score, quantify, compare scores, or generate a radar chart, or when a supplied course rubric requires numeric scores.
+
+- Read `rubric.md` before scoring. Scoring from memory or from example numbers is not allowed.
+- Score each provided draft from 0–100 on all six canonical dimensions and give material-specific evidence for every score.
+- The script handles the increment table and radar; do not draw a text chart yourself.
+- The same six values must be used in the score table, `scores.json`, and any PDF radar.
+- A benchmark is allowed only when the teacher supplied a course target in the current request or materials.
+
+## Evidence boundary
 
 - Use only the uploaded drafts, `rubric.md`, and current-run tool results as factual support.
-- A relative improvement and an absolute error answer different questions. Report both when present, but do not restate RMSE as an average per-sample error or label the value as industry-good/industry-bad unless a current source or teacher criterion supplies that benchmark.
-- Do not derive a pass/fail interval from RMSE alone. Do not add a remembered target such as a typical RMSE, a fixed number of references, or a named external dataset unless it appears in the current evidence.
-- When no acceptance criterion is available, say exactly what is observed, state that quality against the course/project target cannot yet be determined, and ask for the missing baseline.
-- Every high-priority issue must stay closed-loop: `material evidence → student action → student self-check → teacher verification`.
-- Before rendering an evaluation PDF, run `scripts/validate_evaluation_evidence.py` against the JSON, the uploaded report Markdown, and `rubric.md`. It catches ungrounded numeric thresholds, remembered dataset names, and unsupported industry-language. A failed validation means the JSON must be rewritten from current evidence; do not bypass it.
+- Do not convert RMSE into a different metric, invent an acceptance threshold, prescribe a fixed reference count, or name a remembered dataset.
+- When no acceptance criterion is available, report the observed result and ask for the course/project baseline.
+- Every high-priority issue must remain closed-loop: `material evidence → student action → student self-check → teacher verification`.
+- Video evidence may add timestamped oral corroboration and a coverage comparison, but it must never raise a written-report score.
 
 ## Workflow
 
-### 1. Get the drafts
-Read the first draft and final draft from the user's uploads / workspace (`$ALLO_UPLOADS_DIR` / `$ALLO_WORKSPACE_PATH`). It also works with only one draft (produces a single-draft profile only, no increment).
+### 1. Read and verify the drafts
 
-### 2. Six-dimension scoring (you do this)
-**First read `rubric.md` to pin down the bands**, then **deep-read across modalities** (formulas / figures / code / tables all must be examined, not just the body text) and go through those 6 hard-deduction items one by one. Then score the **first draft** and the **final draft** separately, written as a JSON (scores 0–100), with `evidence` giving one sentence of justification per dimension (must cite specific content/data from the draft, no vague generalities):
+Use the files from `$ALLO_UPLOADS_DIR` or `$ALLO_WORKSPACE_PATH`. Prefer an upload-provided same-basename Markdown companion instead of reconverting a PDF. Confirm which file is the first draft and which is the final draft.
+
+### 2. Produce the qualitative comparison
+
+Return:
+
+- Increment overview.
+- Dimension comparison: initial evidence, final evidence, observable change, remaining gap.
+- Changes that are substantive versus language-only.
+- Remaining priorities in closed-loop format.
+- Teacher follow-up questions and student reflection prompts.
+
+Stop here unless quantitative comparison was explicitly requested.
+
+### 3. Quantitative branch only
+
+After reading `rubric.md`, write a temporary `scores.json`:
 
 ```json
 {
@@ -40,36 +67,23 @@ Read the first draft and final draft from the user's uploads / workspace (`$ALLO
   "dimensions": ["创新性", "数据分析深度", "完整性", "文献引用", "结论合理性", "格式规范性"],
   "series": {"初稿": [60, 55, 70, 50, 65, 80], "终稿": [78, 82, 85, 72, 80, 88]},
   "evidence": {
-    "数据分析深度": "终稿新增了分组对比与显著性说明,从'贴图'变为'有分析';初稿仅罗列均值。"
+    "数据分析深度": "终稿新增了分组对比及其解释；初稿只列出了均值。"
   }
 }
 ```
 
-Write it into the workspace, e.g. `scores.json` (leave no extra files in the conversation; a temp directory is fine too).
+The numbers above are schema examples, not scoring standards. Derive all real values from the current drafts and `rubric.md`.
 
-### 3. Render chart + increment table (the script does this)
+Render the quantitative comparison:
+
 ```bash
 python3 scripts/render_eval.py --scores scores.json
 ```
-The script will: ① print the **six-dimension increment table** (初稿/终稿/Δ + total); ② generate a **radar chart** in `$ALLO_OUTPUTS_DIR` (初稿 vs 终稿 overlaid); ③ automatically degrade when matplotlib / a Chinese font is missing (the table still prints, the chart is skipped or uses the D1–D6 abbreviations), never erroring out and interrupting.
 
-Dependency: `matplotlib` (see requirements.txt); the table still works without it.
+The script prints the six-dimension increment table and writes the radar chart to `$ALLO_OUTPUTS_DIR`. If matplotlib or a Chinese font is unavailable, keep the table and report the chart dependency issue; do not invent a replacement chart.
 
-### 4. Give the evaluation (you do this)
-Based on the increment table + radar chart, produce:
-- **Increment highlights**: which dimensions improved the most + the corresponding growth evidence (cite specific changes in the final draft).
-- **Remaining risks**: which dimensions are still weak, and what the final draft still lacks.
-- **Reference comments for the teacher** + **3–5 questions to ask the student** (to elicit missing reasoning, verify evidence choices, and guide the next revision).
+### 4. Optional PDF export
 
-## Optional: AI baseline comparison (a constructive "how far beyond the AI baseline" reference)
-In addition to "初稿 vs 终稿," you can add a third series 「AI独立解法」 — have the agent independently produce a version of the same topic and compare it against the "student + AI final draft." If the student's final draft **exceeds** the AI's independent solution on some dimensions, that highlights where the student added real value beyond the tool. Usage: just add one more entry `"AI独立解法": [...]` to `series`, and the script will draw it into the radar chart as well.
+Do not export a PDF by default. If the user explicitly asks for a downloadable or printable evaluation, use `report-pdf-export` after the evaluation is complete. For a quantitative PDF, the scorecard and radar must use identical six-dimension values and the radar must be the final section. For a qualitative PDF, omit both scorecard and radar.
 
-## Optional: presentation/defense video (objective oral corroboration)
-When a report presentation/defense recording is available, the `report-presentation-review` skill provides an **objective oral corroboration** and a **report↔讲解 coverage comparison**. Use its `report_video_consistency` (covered/thin/absent, 客观参考) together with this increment and the AI baseline as extra evidence for the orally-assessable dimensions — e.g. 讲解充分复述了核心方法 → 强佐证;某要点讲解未展开 → 建议答辩补充。Describe facts and suggest improvements in neutral task/evidence language. The video is an objective corroboration layer, **not** a seventh rubric dimension — the six-dimension scores still come from `rubric.md`.
-
-## Example
-Under `examples/` there is a synthetic sample (topic + first draft + final draft + sample-scores.json), which you can run directly. ⚠️ The `examples/*.json` score files are **rendering demos, not scoring gold standards** — when you actually score a report, derive every number from `rubric.md` (its band anchors and hard-deduction checks), never by imitating the demo numbers:
-```bash
-python3 scripts/render_eval.py --scores examples/sample-scores.json --title "示例:城市共享单车调度课程报告"
-```
-Use it to quickly validate the workflow and show the teacher the result.
+Before rendering a report-based PDF, run `scripts/validate_evaluation_evidence.py` against the JSON, source report Markdown, and `rubric.md`. Fix a failed validation from current evidence; never bypass it.

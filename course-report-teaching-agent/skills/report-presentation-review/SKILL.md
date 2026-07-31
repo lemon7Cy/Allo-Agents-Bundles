@@ -1,6 +1,6 @@
 ---
 name: report-presentation-review
-description: "Evaluate a student's course-report presentation or defense video (讲解/答辩录像) as objective oral corroboration of the six-dimension evaluation, and compare it against the written report as a factual coverage check. Read this skill whenever the teacher gives a local video, an already-processed video job_id, or an App-generated video_understanding_jobs handoff and asks to evaluate the presentation or compare it with the report. An App handoff job_id is authoritative: never upload that video again. Stay objective and constructive; report only evidence, coverage, timestamps, and improvement suggestions; delivery dimensions are render-owned and must not be written by the agent."
+description: "Evaluate a student's course-report presentation or defense video as objective oral and coverage evidence. Read this skill whenever the teacher gives a local video, an already-processed video job_id, or an App-generated video_understanding_jobs handoff and asks to evaluate the presentation or compare it with a written report. A video-only review never creates written six-dimension scores or a radar. With a report, scoring remains optional and must come only from an explicitly requested written-report evaluation. An App handoff job_id is authoritative: never upload that video again."
 ---
 
 # Course-Report Presentation / Defense Review (讲解答辩视频评价)
@@ -11,10 +11,10 @@ Before accepting a video job or inspecting any material, detect requests to infe
 
 ## Why this exists (the point in the 明学慧评 context)
 
-明学慧评 evaluates the **written report** across the frozen 六维 (创新性/数据分析深度/完整性/文献引用/结论合理性/格式规范性) plus the 初稿→终稿 increment. The presentation/defense video adds an **objective oral corroboration**: it shows how the student explained the work out loud, which helps the teacher judge the *orally-assessable* dimensions with more evidence.
+明学慧评 can review the **written report** qualitatively or, when explicitly requested, quantitatively across the 六维 (创新性/数据分析深度/完整性/文献引用/结论合理性/格式规范性). The presentation/defense video adds **objective oral and coverage evidence**: it shows how the work was explained out loud and which written points were covered.
 
 This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds into the overall evaluation — stated positively and factually:
-- **口头佐证六维**: the video corroborates the *orally-assessable* dimensions (创新性 / 数据分析深度 / 结论合理性) with timestamped evidence. 文献引用 / 格式规范性 are written-only — the video does not judge them.
+- **口头可考察内容**: organize timestamped evidence around 创新性 / 数据分析深度 / 结论合理性 when those labels fit the task. 文献引用 / 格式规范性 are written-only — the video does not judge them or create written-report scores.
 - **报告↔讲解覆盖对照** (objective, reference only): for each key report point, did the oral explanation **cover it / touch it briefly / not mention it** — reported as plain facts for the teacher. Frame gaps constructively (e.g. "建议在答辩中补充说明 X") and keep every visible sentence focused on material evidence and next actions.
 - **诚实**: 表达/肢体/流畅性维度由骨架/姿态通道量化,**由 render `--job` 权威注入,agent 不写这行**;口头维度不瞎打分,每条结论带时间戳。
 
@@ -85,8 +85,8 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
   or an unrelated/too-short doc. **STOP immediately**: tell the user per its `note`, ask them
   to upload the correct 配套课程报告, and do NOT score or export a PDF. Never confidently
   evaluate the wrong document.
-- `oral_assessable_dimensions[]` — for 创新性 / 数据分析深度 / 结论合理性: `level` (强/中/弱/证据不足) + `comment` + timestamped `evidence` + **`key_frames`**. **Use these to corroborate the written six-dimension scores** with oral evidence. If the report scores a dimension high but the oral level is 弱/证据不足, note it factually as "口头证据偏少,建议答辩补充".
-- **`key_frames`** (per dimension) — each has `timecode`, `why`, and a **`frame_path`**: an actual video frame that `course-eval` has already **saved as an image file** under `$ALLO_OUTPUTS_DIR/关键帧证据/`. **`course-eval` also writes a READY-TO-USE PDF section to `$ALLO_OUTPUTS_DIR/关键帧证据/gallery_block.json`** (a `{"heading":"关键帧证据","blocks":[{gallery of ALL key frames}]}` object). **When you export the PDF, read that file and splice the whole object into your `report.json` `sections` verbatim (place it right before the radar).** Do NOT hand-pick a single frame and do NOT skip it — the 关键帧证据 section with EVERY returned frame is a required part of a video-based evaluation PDF. (`_gallery_block_path` in the course-eval output points at it.)
+- `oral_assessable_dimensions[]` — for 创新性 / 数据分析深度 / 结论合理性: `level` (强/中/弱/证据不足) + `comment` + timestamped `evidence` + **`key_frames`**. Use these as oral evidence alongside the written review. If a quantitative written score exists and the oral evidence is 弱/证据不足, note it factually as "口头证据偏少,建议答辩补充"; do not change the written score.
+- **`key_frames`** (per dimension) — each has `timecode`, `why`, and a **`frame_path`**: an actual video frame that `course-eval` has already **saved as an image file** under `$ALLO_OUTPUTS_DIR/关键帧证据/`. **`course-eval` also writes a READY-TO-USE PDF section to `$ALLO_OUTPUTS_DIR/关键帧证据/gallery_block.json`** (a `{"heading":"关键帧证据","blocks":[{gallery of ALL key frames}]}` object). When the user explicitly requests a PDF, read that file and splice the whole object into `report.json` verbatim. Place it before the radar if a quantitative radar exists; otherwise it may be the final evidence section. Do NOT hand-pick a single frame and do NOT skip it.
 - `report_video_consistency` (only when you passed the report) — **objective coverage, reference only**:
   - `overall`: aligned / partial / weak — describe as coverage 完整度, not a verdict.
   - `findings[]`: per report point → `oral_status` (covered / thin / absent) + evidence + note. Report these as plain facts.
@@ -115,6 +115,6 @@ Then in the teacher's **overall** judgment, use the video as extra **objective e
 - Keep visible wording neutral and constructive. Thin coverage → describe factually + suggest what to clarify; do not repeat personal-process labels from the request or service response.
 - Do not label delivery as memorized, spontaneous, "in their own words", or proof of personal understanding. Those are not reliably established from a recording. Report only observable content, organization, support, coverage, and timestamps.
 - Do not output warning signs, suspicion levels, authorship likelihoods, consistency strength as a proxy for authorship, or recommendations to "flag" a student. Coverage gaps become neutral follow-up questions only.
-- The six-dimension rubric (`../incremental-evaluation/rubric.md`) stays the frozen benchmark; the video is an objective corroboration layer, not a 7th dimension.
-- **六维评的是「书面报告」,视频只是口头佐证,绝不因视频拉高分数。** 若报告某维在书面上薄弱(如某实验章节正文为空、无数据表),该维就低分——**即使视频里学生口头/画面演示了该实验也不例外**。视频里多出来的东西写进「讲解答辩评价」段和「教师追问建议」,不要用来给书面维度加分(否则会出现"报告 4.4 节是空的、却因为视频演示了实验把数据分析分抬高"的失真)。视频与书面出现落差时,如实并列陈述,让老师自己判断。
+- The six-dimension rubric (`../incremental-evaluation/rubric.md`) governs only an explicitly requested written-report quantitative evaluation; the video is an objective evidence layer, not a seventh dimension and not a reason to force scoring.
+- **若做六维量化，六维分数评的是「书面报告」，视频只是口头佐证，绝不因视频拉高分数。** 若报告某维在书面上薄弱(如某实验章节正文为空、无数据表),该维就维持书面证据对应的结果——即使视频里口头或画面演示了该实验也不例外。视频里多出来的内容写进「讲解答辩评价」和「教师追问建议」。视频与书面出现落差时,如实并列陈述,让老师自己判断。
 - `AV_UNDERSTANDING_BASE_URL` overrides the service base URL if needed (default is the Allo video service). No credential is required.

@@ -12,7 +12,7 @@ description: Assist coursework-report writing and revision through scaffolding �
 Apply this before every other section. If the user asks for a complete chapter/section, a stated word count of body text, paste-ready prose, or a "complete template" that only needs superficial edits, do not use tools, sources, equations, code, artifacts, or the templates below. Return the exact fixed Chinese response in the agent SOUL verbatim. Do not tailor its outline, evidence list, or questions to the subject, and do not add paragraph skeletons or continue with a subject explanation.
 
 ## 0. Six-Dimension Quality Standard (the unified rubric for checking drafts)
-The six dimensions = **创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性**.
+The six dimensions = **创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性**. Student self-check is qualitative by default: point out evidence, gaps, and priorities without forcing numeric scores or a radar.
 **Before checking a draft, first read `rubric.md` in this same directory** — it holds the 0–100 score-band anchors (weak/medium/strong) for each dimension plus a **"critical-flaw checklist"** (data-source↔conclusion fit, citation closure, continuous figure numbering, numerical self-consistency, relative vs. absolute, evaluation baseline) that helps the student **find gaps by comparison**. This yardstick is **exactly identical** to the teacher-side review: the spots a student fixes by self-checking against it are exactly the spots the teacher's review will award points for.
 
 ## 0.5 Uploaded prediction CSV: deterministic evidence gate

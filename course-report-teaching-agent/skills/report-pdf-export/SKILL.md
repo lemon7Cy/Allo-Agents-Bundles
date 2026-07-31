@@ -1,6 +1,6 @@
 ---
 name: report-pdf-export
-description: Export a finished course-report evaluation as a tidy, print-ready PDF — one file per report. Read this skill WHENEVER the teacher, after an evaluation has been produced (六维评分 / 增量评价 / 讲解答辩一致性核验), asks for a 完整规整的报告、导出 PDF、"pdf 吧"、可打印/可下发的评价报告 (and by default whenever an evaluation deliverable is produced). You build a small JSON from the evaluation you already produced and run the renderer; it lays out title, meta, sections, score tables, key-frame evidence and the ability radar into a clean A4 PDF. Chinese fonts are embedded for reliable browser/download viewing, and declared images are validated instead of being silently skipped. Write ONLY to /mnt/user-data/outputs/ and name the file after the report/课题 title (报告标题-课程报告评价.pdf), never after student names. Do NOT invent scores or findings here — only render what the evaluation already established.
+description: Export an already-finished course-report evaluation as a tidy, print-ready PDF when the teacher explicitly asks for a downloadable, printable, archivable, or handout-ready report. It supports qualitative reviews, quantitative six-dimension reviews, draft comparisons, video-only reviews, and report-plus-video reviews. Add scorecards and a radar only when a quantitative six-dimension evaluation was actually requested and completed. Write only to /mnt/user-data/outputs/ and name the file after the report or topic title, never after student names. This skill renders existing findings; it never invents scores or re-evaluates the work.
 ---
 
 # Course-Report PDF Export (评价报告导出 PDF)
@@ -14,15 +14,20 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
 
 ## When to read this skill
 
-- Whenever you finish an evaluation deliverable (PDF is the standard output), or the
-  teacher says 导出 PDF / 生成 PDF / "pdf 吧" / 完整规整一点的报告 / 可打印的评价报告.
-- After a 六维评分, 初终稿增量评价 ([[incremental-evaluation]]), or 讲解答辩评价
-  ([[report-presentation-review]]).
+- When the teacher says 导出 PDF / 生成 PDF / "pdf 吧" / 完整规整一点的报告 /
+  可打印、可下载、可归档或可下发的评价报告.
+- After the requested evaluation has already been completed in chat or structured data.
+- Do not read or invoke this skill merely because the user asked for feedback.
 - One PDF per report → one render call → named after the report title.
 
 ## How to use
 
-1. Assemble a `report.json` from the evaluation you already produced (schema below).
+1. Identify the evaluation mode and assemble a `report.json` from findings already produced:
+   - `qualitative`: no `scorecard`, no `radar`.
+   - `quantitative_six_dimension`: exactly six canonical scores in both `scorecard` and `radar`.
+   - `incremental_qualitative`: no numeric scores or radar.
+   - `incremental_quantitative`: six canonical values per compared draft; include only the chart structure supported by the completed evaluation.
+   - `video_only` or `report_video_qualitative`: timestamped evidence and key frames are allowed, but no written-report scorecard or radar.
    Put real, already-established content only — never fabricate scores or findings.
 2. Validate `report.json` in a separate command. Do not combine validation and rendering, do not
    use a heredoc or inline Python to create/repair the document, and do not install packages:
@@ -48,7 +53,7 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
    never switch to the plain `python3`, and never retry by embedding the whole report in a shell
    command.
 
-   **When the evaluation includes a 讲解答辩视频, ALWAYS pass `--job <job_id>`.** With it,
+   **When the exported evaluation includes a 讲解答辩视频, ALWAYS pass `--job <job_id>`.** With it,
    the renderer fetches the video's key frames itself and guarantees the 「关键帧证据」
    gallery even if your `report.json` didn't include one — so the frames can never be lost
    to a missed step. (If your `report.json` already has the gallery, `--job` is a harmless
@@ -68,7 +73,7 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
      filename. One PDF per report; do not render the same report to two names.
 4. `present_files` the resulting PDF and tell the teacher in chat what was produced.
 
-Keep this to four deterministic tool calls (write JSON → validate JSON → render → present). Do not
+Keep this to four deterministic tool calls (write JSON → validate JSON/evidence → render → present). Do not
 re-fetch the evaluation or re-run scoring — this skill only renders.
 
 ### Markdown fallback
@@ -90,6 +95,7 @@ rendered PDF is user-facing.
 
 ```json
 {
+  "evaluation_mode": "quantitative_six_dimension",
   "title": "课程报告评价",
   "subtitle": "六维评分 + 报告与讲解一致性核验",
   "meta": [
@@ -123,7 +129,7 @@ rendered PDF is user-facing.
     {
       "heading": "六维能力雷达",
       "blocks": [
-        {"type": "radar", "max": 100, "benchmark": 80, "caption": "蓝色为本次得分,灰色虚线为达标标准线;越靠外该维度越强。",
+        {"type": "radar", "max": 100, "caption": "蓝色为本次六维量化结果；越靠外表示该维度的本次参考分更高。",
          "dimensions": [
            {"name": "创新性", "score": 78}, {"name": "数据分析深度", "score": 88},
            {"name": "完整性", "score": 82}, {"name": "文献引用", "score": 70},
@@ -162,18 +168,14 @@ Put each `key_frames[].frame_path` into `data` (a file path OR a base64 data-URL
 build each `caption` from the dimension + `timecode` + `why`. `gallery` items are
 `{data, caption}`; frames that fail to load are skipped. (`image` is the single-image variant.)
 
-**Always include a `radar` block for a six-dimension evaluation, placed at the END**
-(after the scoring table), so the report reads
-综合结论 → 六维评分表 → (报告↔讲解覆盖对照) → (关键帧证据 gallery,若有讲解视频) → 能力雷达图.
-This is the 能力雷达图量化评分 look. Use the same six scores you show in the `scorecard`.
-The radar is drawn as a crisp vector chart (no image files); it needs at least 3 dimensions.
+**Radar contract:** include a `radar` block only for an explicitly requested quantitative
+six-dimension evaluation. It must be placed at the END, after all evidence, coverage, and
+key-frame sections. Use exactly the same six canonical dimensions and numeric values shown
+in the `scorecard`. The radar is a crisp vector chart and must not be added to qualitative or
+video-only evaluations.
 
-**Set a standard line with `benchmark`** so each dimension shows how far it reaches against
-a target (like a game character's radar). `benchmark` is either one number (a uniform
-达标线, e.g. `80`) or a list of per-dimension targets aligned with `dimensions`. It renders
-as a gray dashed reference polygon behind the blue score polygon. Default the uniform
-达标线 to the course's passing/good standard (e.g. 80) unless the teacher gives specific
-per-dimension targets.
+`benchmark` is optional. Add it only when the teacher supplied a course target or per-dimension
+standard in the current request or materials. Never invent or default a passing line.
 
 ## Honesty & tone
 

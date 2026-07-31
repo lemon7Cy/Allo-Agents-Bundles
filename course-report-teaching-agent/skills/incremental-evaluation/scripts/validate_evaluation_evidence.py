@@ -18,6 +18,9 @@ EXTERNAL_ASSERTION_PATTERNS = (
 )
 REMEMBERED_DATASET_TERMS = ("NASA", "PCoE")
 ALLOWED_TEXT_NUMBERS = {"0", "1", "2", "3", "4", "5", "6", "100"}
+CANONICAL_DIMENSIONS = ("创新性", "数据分析深度", "完整性", "文献引用", "结论合理性", "格式规范性")
+QUANTITATIVE_MODES = {"quantitative_six_dimension", "incremental_quantitative"}
+QUALITATIVE_MODES = {"qualitative", "incremental_qualitative", "video_only", "report_video_qualitative"}
 
 
 def _normalise_number(token: str) -> str:
@@ -91,6 +94,95 @@ def _benchmark_issues(value: Any, path: tuple[str, ...] = ()) -> list[dict[str, 
     return issues
 
 
+def _section_blocks(data: Any) -> list[tuple[int, int, dict[str, Any]]]:
+    if not isinstance(data, dict) or not isinstance(data.get("sections"), list):
+        return []
+    blocks: list[tuple[int, int, dict[str, Any]]] = []
+    for section_index, section in enumerate(data["sections"]):
+        if not isinstance(section, dict) or not isinstance(section.get("blocks"), list):
+            continue
+        for block_index, block in enumerate(section["blocks"]):
+            if isinstance(block, dict):
+                blocks.append((section_index, block_index, block))
+    return blocks
+
+
+def _named_scores(block: dict[str, Any], key: str) -> tuple[list[str], dict[str, float], list[dict[str, str]]]:
+    path = f"sections.{key}"
+    entries = block.get(key)
+    if not isinstance(entries, list):
+        return [], {}, [{"path": path, "kind": "invalid_score_structure", "value": "expected_list"}]
+    names: list[str] = []
+    scores: dict[str, float] = {}
+    issues: list[dict[str, str]] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            issues.append({"path": f"{path}.{index}", "kind": "invalid_score_entry", "value": "expected_object"})
+            continue
+        name = entry.get("name")
+        score = entry.get("score")
+        if not isinstance(name, str) or not name:
+            issues.append({"path": f"{path}.{index}.name", "kind": "invalid_dimension_name", "value": str(name)})
+            continue
+        names.append(name)
+        if name in scores:
+            issues.append({"path": f"{path}.{index}.name", "kind": "duplicate_dimension", "value": name})
+        if not isinstance(score, (int, float)) or isinstance(score, bool):
+            issues.append({"path": f"{path}.{index}.score", "kind": "invalid_dimension_score", "value": str(score)})
+            continue
+        scores[name] = float(score)
+    return names, scores, issues
+
+
+def _quantitative_structure_issues(data: Any) -> list[dict[str, str]]:
+    if not isinstance(data, dict):
+        return [{"path": "", "kind": "invalid_report_structure", "value": "expected_object"}]
+
+    mode = data.get("evaluation_mode")
+    blocks = _section_blocks(data)
+    scorecards = [(si, bi, block) for si, bi, block in blocks if block.get("type") == "scorecard"]
+    radars = [(si, bi, block) for si, bi, block in blocks if block.get("type") == "radar"]
+    has_quantitative_blocks = bool(scorecards or radars)
+    quantitative = mode in QUANTITATIVE_MODES or has_quantitative_blocks
+
+    if mode in QUALITATIVE_MODES and has_quantitative_blocks:
+        return [{"path": "evaluation_mode", "kind": "qualitative_contains_quantitative_blocks", "value": str(mode)}]
+    if not quantitative:
+        return []
+
+    issues: list[dict[str, str]] = []
+    if len(scorecards) != 1:
+        issues.append({"path": "sections", "kind": "quantitative_scorecard_count", "value": str(len(scorecards))})
+    if len(radars) != 1:
+        issues.append({"path": "sections", "kind": "quantitative_radar_count", "value": str(len(radars))})
+    if len(scorecards) != 1 or len(radars) != 1:
+        return issues
+
+    score_section, score_block_index, scorecard = scorecards[0]
+    radar_section, radar_block_index, radar = radars[0]
+    score_names, score_values, score_issues = _named_scores(scorecard, "items")
+    radar_names, radar_values, radar_issues = _named_scores(radar, "dimensions")
+    issues.extend(score_issues)
+    issues.extend(radar_issues)
+
+    expected = list(CANONICAL_DIMENSIONS)
+    if score_names != expected:
+        issues.append({"path": f"sections.{score_section}.blocks.{score_block_index}.items", "kind": "noncanonical_scorecard_dimensions", "value": "|".join(score_names)})
+    if radar_names != expected:
+        issues.append({"path": f"sections.{radar_section}.blocks.{radar_block_index}.dimensions", "kind": "noncanonical_radar_dimensions", "value": "|".join(radar_names)})
+    if score_values and radar_values and score_values != radar_values:
+        issues.append({"path": f"sections.{radar_section}.blocks.{radar_block_index}.dimensions", "kind": "scorecard_radar_mismatch", "value": "scores_differ"})
+
+    sections = data.get("sections")
+    if isinstance(sections, list):
+        if radar_section != len(sections) - 1:
+            issues.append({"path": f"sections.{radar_section}", "kind": "radar_section_not_last", "value": str(radar_section)})
+        radar_blocks = sections[radar_section].get("blocks") if isinstance(sections[radar_section], dict) else None
+        if isinstance(radar_blocks, list) and radar_block_index != len(radar_blocks) - 1:
+            issues.append({"path": f"sections.{radar_section}.blocks.{radar_block_index}", "kind": "radar_block_not_last", "value": str(radar_block_index)})
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True)
@@ -112,6 +204,7 @@ def main() -> int:
     issues: list[dict[str, str]] = []
     if not args.allow_benchmark:
         issues.extend(_benchmark_issues(data))
+    issues.extend(_quantitative_structure_issues(data))
 
     for path, text in _walk_strings(data):
         if path and path[0] == "meta":

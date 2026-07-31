@@ -18,6 +18,7 @@ BANNED_LITERALS = (
     "job_id", "任务号", "已复用", "/mnt/", "course-eval", "oral_assessable_dimensions",
     "至少", "不少于", "若干", "多项", "多个", "多处", "几项", "几处", "一系列",
     "一张", "一条", "各补", "各增加", "各添加", "必须", "严重", "最薄弱",
+    "偏高", "偏低", "过高", "过低",
     "✅", "❌", "⚠️", "covered", "thin", "absent", "partial",
 )
 QUALITATIVE_ONLY_LITERALS = ("评分", "得分", "雷达", "PDF", "导出")

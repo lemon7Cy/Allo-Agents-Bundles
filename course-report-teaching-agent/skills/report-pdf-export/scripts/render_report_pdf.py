@@ -118,6 +118,10 @@ _VISIBLE_LANGUAGE_FIXES = {
     "cheating": "task scope",
     "misconduct": "policy scope",
     "authorship": "work process",
+    "偏高": "需要结合课程或项目基线判断",
+    "偏低": "需要结合课程或项目基线判断",
+    "过高": "需要结合课程或项目基线判断",
+    "过低": "需要结合课程或项目基线判断",
 }
 
 

@@ -41,6 +41,10 @@ BLOCKED_VISIBLE_TERMS = (
     "归一化腕位移",
     "pose_delivery",
     "yolov8-pose",
+    "偏高",
+    "偏低",
+    "过高",
+    "过低",
 )
 PRESCRIPTIVE_QUANTITY_RE = re.compile(
     r"(?:至少|不少于)\s*(?:一|二|三|四|五|六|七|八|九|十|\d+)?\s*(?:篇|处|条|个|张|项|组|次|分钟)"

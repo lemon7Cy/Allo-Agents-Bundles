@@ -44,6 +44,7 @@ OBSERVATION_SIGNAL = re.compile(
     re.IGNORECASE,
 )
 DOI_PATTERN = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
+DEFAULT_FETCH_REGISTRY = Path("/mnt/user-data/tmp/public_literature_fetch_registry.json")
 
 DESIGN_LABELS = {
     "correlational": "相关性研究",
@@ -149,6 +150,7 @@ def _validate_payload(payload: object) -> dict:
         raise ValidationError("items must contain 1 to 5 verified sources")
 
     validation_errors: list[str] = []
+    normalizations: list[str] = []
     items: list[dict] = []
     for index, raw in enumerate(raw_items, start=1):
         if not isinstance(raw, dict):
@@ -165,17 +167,24 @@ def _validate_payload(payload: object) -> dict:
         facts = raw.get("official_page_facts")
         if not isinstance(facts, list):
             raise ValidationError(f"{item_label}.official_page_facts must be a list")
-        if not 1 <= len(facts) <= 4:
-            validation_errors.append(f"{item_label} has {len(facts)} official_page_facts; keep 1 to 4")
-        clean_facts = [_required_text(fact, f"items[{index}].official_page_facts", max_length=500) for fact in facts]
-        for fact in clean_facts:
+        raw_clean_facts = [_required_text(fact, f"items[{index}].official_page_facts", max_length=500) for fact in facts]
+        clean_facts: list[str] = []
+        for fact in raw_clean_facts:
             if not CJK_TEXT.search(fact):
-                validation_errors.append(f"{item_label} facts must be written as neutral Simplified Chinese observations: {fact}")
-            else:
-                if CAUSAL_OVERCLAIM.search(fact):
-                    validation_errors.append(f"{item_label} uses causal/interpretive wording; rewrite it as a direct page observation or association: {fact}")
-                if not OBSERVATION_SIGNAL.search(fact):
-                    validation_errors.append(f"{item_label} needs a direct observation verb such as 报告/显示/发现/记录/收集: {fact}")
+                normalizations.append(f"{item_label}: dropped non-Chinese fact")
+                continue
+            if CAUSAL_OVERCLAIM.search(fact):
+                normalizations.append(f"{item_label}: dropped causal/interpretive fact")
+                continue
+            if not OBSERVATION_SIGNAL.search(fact):
+                normalizations.append(f"{item_label}: dropped fact without a direct observation signal")
+                continue
+            clean_facts.append(fact)
+        if len(clean_facts) > 4:
+            normalizations.append(f"{item_label}: kept the first 4 safe facts")
+            clean_facts = clean_facts[:4]
+        if not clean_facts:
+            validation_errors.append(f"{item_label} has no safe direct observations after normalization")
         if design == "experimental" and any(CORRELATION_SIGNAL.search(fact) for fact in clean_facts):
             design = "correlational"
 
@@ -193,7 +202,7 @@ def _validate_payload(payload: object) -> dict:
         try:
             doi = _optional_doi(raw.get("doi"), f"items[{index}].doi")
         except ValidationError as exc:
-            validation_errors.append(f"{item_label}: {exc}")
+            normalizations.append(f"{item_label}: omitted invalid DOI ({exc})")
             doi = None
         official_url = _required_text(raw.get("official_url"), f"items[{index}].official_url", max_length=1000)
         doi_visible_in_url = bool(doi and _contains_exact_doi(official_url, doi))
@@ -202,9 +211,8 @@ def _validate_payload(payload: object) -> dict:
             and any("doi" in fact.casefold() and _contains_exact_doi(fact, doi) for fact in clean_facts)
         )
         if doi and not (doi_visible_in_url or doi_visible_in_fact):
-            validation_errors.append(
-                f"{item_label} DOI must appear as an exact identifier in the exact opened official_url or in a `页面显示 DOI：...` fact; preserve official_url exactly and set DOI to null if the fetched page did not show it"
-            )
+            normalizations.append(f"{item_label}: omitted DOI without exact current-page provenance")
+            doi = None
 
         items.append(
             {
@@ -240,7 +248,26 @@ def _validate_payload(payload: object) -> dict:
 
     if validation_errors:
         raise ValidationError(" | ".join(validation_errors))
-    return {"topic": topic, "course": course, "items": items, "unverified": unverified}
+    return {
+        "topic": topic,
+        "course": course,
+        "items": items,
+        "unverified": unverified,
+        "_normalizations": normalizations,
+    }
+
+
+def _validate_fetch_registry(payload: dict, registry_path: Path) -> None:
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValidationError(f"fetch registry is missing or invalid: {error}") from error
+    urls = registry.get("urls") if isinstance(registry, dict) else None
+    if not isinstance(urls, list) or not all(isinstance(url, str) for url in urls):
+        raise ValidationError("fetch registry urls must be a string list")
+    missing = [item["official_url"] for item in payload["items"] if item["official_url"] not in urls]
+    if missing:
+        raise ValidationError(f"official_url was not registered before web_fetch: {missing}")
 
 
 def _bibliography(item: dict) -> str:
@@ -318,12 +345,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--fetch-registry", type=Path, default=DEFAULT_FETCH_REGISTRY)
     args = parser.parse_args()
 
     input_path = Path(args.input)
     output_path = Path(args.output)
     try:
         payload = _validate_payload(json.loads(input_path.read_text(encoding="utf-8")))
+        _validate_fetch_registry(payload, args.fetch_registry)
         markdown, summary = render(payload)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(markdown, encoding="utf-8")
@@ -331,7 +360,17 @@ def main() -> int:
         print(json.dumps({"status": "error", "error": str(error)}, ensure_ascii=False))
         return 2
 
-    print(json.dumps({"status": "ok", "output": str(output_path), "safe_chat_summary": summary}, ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "output": str(output_path),
+                "safe_chat_summary": summary,
+                "normalizations": payload.get("_normalizations", []),
+            },
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 

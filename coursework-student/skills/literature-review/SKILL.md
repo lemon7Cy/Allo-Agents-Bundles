@@ -15,6 +15,11 @@ Help the student **quickly get oriented in the literature landscape of a topic**
 
 ### Public-web verification contract
 
+- Before the first `web_fetch`, reset the deterministic fetch registry exactly once:
+  `python3 /mnt/skills/agent/literature-review/scripts/guard_public_literature_fetch.py --reset`.
+- Immediately before every `web_fetch`, register its exact proposed URL with:
+  `python3 /mnt/skills/agent/literature-review/scripts/guard_public_literature_fetch.py --url '<exact URL>'`.
+  Call `web_fetch` only when the guard returns `status=ok`, and use the returned URL without alteration. If it returns `status=error`, do not fetch that URL; choose another paper or keep the lead unverified. Never call `web_fetch` directly without this guard.
 - Use exactly one web tool call per assistant message. Never dispatch parallel `web_search` or `web_fetch` calls; the production gateway requires one tool result for every tool call and parallel literature batches can break that contract.
 - Use at most two `web_search` calls total. Never search one paper at a time. The first call must be one topic-level discovery query broad enough to return several candidates; use the optional second call only to fill one explicit evidence gap. Search results are discovery leads only; verify selected candidates with sequential `web_fetch` calls.
 - Before placing a candidate in `关键文献（已核实）`, open a current official record with `web_fetch`: DOI resolver, publisher/journal page, Crossref, PubMed/PMC, or an institutional repository. Before every fetch, compare the proposed URL byte-for-byte against an internal `opened_urls` set; a successful fetch adds the URL immediately, and calling it again is a hard failure. A successful extraction does not reveal more content when repeated. Also treat URLs for the same DOI/title (for example `/full` and `/abs`) as one candidate: use the first opened page as-is, or abandon that candidate and choose a different paper instead of opening another view. The opened page must match the title and at least one other field (author, venue, or year).
@@ -87,7 +92,7 @@ python3 /mnt/skills/agent/literature-review/scripts/render_public_literature_gui
   --output /mnt/user-data/outputs/文献导读.md
 ```
 
-If the renderer returns `status=error`, read the entire aggregated error, correct every listed issue in one ledger edit, and rerun. Allow at most two reruns total. Do not patch one error at a time, do not bypass the renderer, and do not hand-write the output. On `status=ok`, call `present_files` for `/mnt/user-data/outputs/文献导读.md` and return `safe_chat_summary` verbatim as the whole final answer.
+The renderer safely omits unsupported DOIs and unsafe or surplus fact sentences; inspect its `normalizations` only for internal awareness and do not rewrite the ledger merely to restore omitted content. If it returns `status=error`, read the entire aggregated structural error, correct every listed issue in one ledger edit, and rerun. Allow at most two reruns total. Do not patch one error at a time, do not bypass the renderer, and do not hand-write the output. On `status=ok`, call `present_files` for `/mnt/user-data/outputs/文献导读.md` and return `safe_chat_summary` verbatim as the whole final answer.
 
 ## 1. Workflow
 1. **Clarify the topic and scenario**: course, discipline, topic direction, existing background. If vague, ask one follow-up question first.

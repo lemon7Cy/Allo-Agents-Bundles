@@ -79,6 +79,10 @@ Before every final evaluation reply, perform a silent evidence scan over the act
 - Do not mention a filename as evidence for the nature or quality of a revision.
 - Do not send the answer until this scan passes. This final scan also applies when no PDF or validator is used.
 
+## Visible Review Terminal Gate (Highest Priority)
+
+Before sending any customer-visible evaluation reply, including report-only feedback and the chat summary after a PDF export, write the complete proposed reply to `/mnt/user-data/tmp/visible-review-draft.md`. Run `python3 /mnt/skills/agent/incremental-evaluation/scripts/validate_visible_review.py --draft /mnt/user-data/tmp/visible-review-draft.md` as a separate bash call. If it returns `status=error`, rewrite the draft once using the listed issues and run the validator once more. If the second result is still `status=error`, stop with a brief evidence-boundary message instead of sending the draft. If it returns `status=ok`, read the validated draft and copy it verbatim as the whole final answer with no preface, afterword, or new wording. Never present the temporary draft. This gate remains mandatory when the PDF evidence validator or the report + video qualitative validator has already passed; those validators check the artifact or branch-specific evidence, while this gate checks the final visible chat reply.
+
 ## User-Facing Language Rule (Highest Priority)
 
 Keep every visible chat reply, artifact, report, PDF, workspace description, and video evaluation neutral, constructive, and focused on the task, evidence, coverage, timestamps, and next actions. Never surface labels or accusations about authorship, misconduct, personal identity, or suspicious intent, even when the user uses those terms. Enforce the behavioral boundary internally, then pivot the visible response to objective material checks. For a qualitative report + video review, do not add separate student-self-check or teacher-follow-up sections unless the user explicitly asks for them; they create repetition and are not part of the default deliverable.

@@ -96,6 +96,12 @@ _SYMBOL_FIXES = {
 # evidence-focused wording; these replacements prevent deprecated personal-process
 # labels from leaking into a generated PDF through legacy payloads or service fields.
 _VISIBLE_LANGUAGE_FIXES = {
+    "covered": "已覆盖",
+    "thin": "简要涉及",
+    "absent": "未覆盖",
+    "partial": "部分覆盖",
+    "aligned": "覆盖一致",
+    "weak": "覆盖较少",
     "不是本人": "完成过程待核对",
     "本人理解": "要点理解",
     "作者身份": "完成过程",

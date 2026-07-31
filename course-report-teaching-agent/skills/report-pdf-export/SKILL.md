@@ -5,6 +5,8 @@ description: Export an already-finished course-report evaluation as a tidy, prin
 
 # Course-Report PDF Export (评价报告导出 PDF)
 
+All visible coverage states must use customer-facing Chinese labels. Convert `aligned / partial / weak` to `覆盖一致 / 部分覆盖 / 覆盖较少`, and `covered / thin / absent` to `已覆盖 / 简要涉及 / 未覆盖`; never place the raw enum values in JSON text, tables, captions, or chat summaries.
+
 ## Why this exists
 
 The agent already produces evaluations as Markdown/chat text. Teachers need a

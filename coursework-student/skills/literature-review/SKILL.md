@@ -84,7 +84,7 @@ python3 /mnt/skills/agent/literature-review/scripts/render_public_literature_gui
   --output /mnt/user-data/outputs/文献导读.md
 ```
 
-If the renderer returns `status=error`, correct only the JSON ledger and run it again, with at most two correction attempts. Do not bypass the renderer or hand-write the output. On `status=ok`, call `present_files` for `/mnt/user-data/outputs/文献导读.md` and return `safe_chat_summary` verbatim as the whole final answer.
+If the renderer returns `status=error`, read the entire aggregated error, correct every listed issue in one ledger edit, and rerun. Allow at most two reruns total. Do not patch one error at a time, do not bypass the renderer, and do not hand-write the output. On `status=ok`, call `present_files` for `/mnt/user-data/outputs/文献导读.md` and return `safe_chat_summary` verbatim as the whole final answer.
 
 ## 1. Workflow
 1. **Clarify the topic and scenario**: course, discipline, topic direction, existing background. If vague, ask one follow-up question first.

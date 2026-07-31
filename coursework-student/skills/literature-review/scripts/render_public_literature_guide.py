@@ -32,7 +32,7 @@ NON_CAUSAL_DESIGNS = {
     "other",
 }
 CAUSAL_OVERCLAIM = re.compile(
-    r"导致|证明|证实|因果|影响|损伤|损害|受损|缺陷|群体后果|引发|揭示|机制|路径|黏性|心流|即时满足|实证基础|神经证据|实验证据|行为证据|被引|研究者推论|认知资源|会提升|会增加|会降低|会减少|→|⇒|\bcaus(?:e|es|ed|ing)\b|\bleads?\s+to\b|\bimpact(?:s|ed|ing)?\b|\bdamag(?:e|es|ed|ing)\b|\bmechanisms?\b|\bpathways?\b",
+    r"导致|证明|证实|因果|影响|损伤|损害|受损|缺陷|群体后果|引发|揭示|机制|路径|黏性|心流|即时满足|实证基础|神经证据|实验证据|行为证据|被引|研究者推论|认知资源|表明|提示|会提升|会增加|会降低|会减少|→|⇒|\bcaus(?:e|es|ed|ing)\b|\bleads?\s+to\b|\bimpact(?:s|ed|ing)?\b|\bdamag(?:e|es|ed|ing)\b|\bmechanisms?\b|\bpathways?\b",
     re.IGNORECASE,
 )
 CORRELATION_SIGNAL = re.compile(r"相关|关联|关系|r\s*=|p\s*=|问卷|量表|得分|横断面", re.IGNORECASE)
@@ -143,6 +143,8 @@ def _validate_payload(payload: object) -> dict:
     for index, raw in enumerate(raw_items, start=1):
         if not isinstance(raw, dict):
             raise ValidationError(f"items[{index}] must be an object")
+        title = _required_text(raw.get("title"), f"items[{index}].title", max_length=500)
+        item_label = f"items[{index}] '{title}'"
         design = _required_text(raw.get("study_design"), f"items[{index}].study_design", max_length=40)
         if design not in ALLOWED_DESIGNS:
             raise ValidationError(f"items[{index}].study_design is unsupported")
@@ -151,16 +153,19 @@ def _validate_payload(payload: object) -> dict:
             raise ValidationError(f"items[{index}].topic_role is unsupported")
 
         facts = raw.get("official_page_facts")
-        if not isinstance(facts, list) or not 1 <= len(facts) <= 4:
-            raise ValidationError(f"items[{index}].official_page_facts must contain 1 to 4 facts")
+        if not isinstance(facts, list):
+            raise ValidationError(f"{item_label}.official_page_facts must be a list")
+        if not 1 <= len(facts) <= 4:
+            validation_errors.append(f"{item_label} has {len(facts)} official_page_facts; keep 1 to 4")
         clean_facts = [_required_text(fact, f"items[{index}].official_page_facts", max_length=500) for fact in facts]
         for fact in clean_facts:
             if not CJK_TEXT.search(fact):
-                validation_errors.append(f"items[{index}] facts must be written as neutral Simplified Chinese observations: {fact}")
-            elif CAUSAL_OVERCLAIM.search(fact):
-                validation_errors.append(f"items[{index}] uses causal/strong wording; rewrite it as a direct page observation or association: {fact}")
-            elif not OBSERVATION_SIGNAL.search(fact):
-                validation_errors.append(f"items[{index}] is not a metadata/method/sample/direct-result observation: {fact}")
+                validation_errors.append(f"{item_label} facts must be written as neutral Simplified Chinese observations: {fact}")
+            else:
+                if CAUSAL_OVERCLAIM.search(fact):
+                    validation_errors.append(f"{item_label} uses causal/interpretive wording; rewrite it as a direct page observation or association: {fact}")
+                if not OBSERVATION_SIGNAL.search(fact):
+                    validation_errors.append(f"{item_label} needs a direct observation verb such as 报告/显示/发现/记录/收集: {fact}")
         if design == "experimental" and any(CORRELATION_SIGNAL.search(fact) for fact in clean_facts):
             design = "correlational"
 
@@ -175,13 +180,19 @@ def _validate_payload(payload: object) -> dict:
             if part_text not in clean_focus:
                 clean_focus.append(part_text)
 
+        try:
+            doi = _optional_doi(raw.get("doi"), f"items[{index}].doi")
+        except ValidationError as exc:
+            validation_errors.append(f"{item_label}: {exc}")
+            doi = None
+
         items.append(
             {
-                "title": _required_text(raw.get("title"), f"items[{index}].title", max_length=500),
+                "title": title,
                 "first_author": _optional_text(raw.get("first_author"), f"items[{index}].first_author", max_length=120),
                 "year": _optional_year(raw.get("year"), f"items[{index}].year"),
                 "venue": _optional_text(raw.get("venue"), f"items[{index}].venue", max_length=200),
-                "doi": _optional_doi(raw.get("doi"), f"items[{index}].doi"),
+                "doi": doi,
                 "official_url": _required_text(raw.get("official_url"), f"items[{index}].official_url", max_length=1000),
                 "study_design": design,
                 "topic_role": role,

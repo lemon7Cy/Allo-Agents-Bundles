@@ -1,6 +1,6 @@
 agent: coursework-student
 display_name: 课程报告助手（学生端）
-summary: 课程报告全流程的认知伙伴——辅助探索选题、文献导读、撰写与修订，引导学生自己想得更深、写得更好，而非代写。
+summary: 课程报告全流程的认知伙伴——辅助探索选题、文献导读、撰写与修订，引导学生把思路、证据和表达做得更扎实。
 
 capabilities:
   - id: explore-and-topic
@@ -15,7 +15,7 @@ capabilities:
     label: 撰写与修订
     required: true
     role: workflow
-    description: 就领域问题答疑、必要时给可运行的分析代码、按质量维度帮学生检查并指出初稿问题（不代写）。
+    description: 就领域问题答疑、必要时给可运行的分析代码、按质量维度帮学生检查初稿并生成修改任务。
 
   - id: self-assess-and-reflect
     type: review
@@ -35,7 +35,14 @@ capabilities:
     label: 明学知识库 · 证据脚手架
     required: false
     role: knowledge
-    description: 围绕选题用明学 RAGFlow 知识库（电池/储能/SOC/SOH 等）检索真实证据（正文/图表/参考文献），给学生阅读地图、支架自己读自己写，绝不代写、不杜撰。随 bundle 内置于 skills/kb-evidence-scaffold（需配置 MINGXUE_API_TOKEN）。
+    description: 围绕选题用明学 RAGFlow 知识库（电池/储能/SOC/SOH 等）检索可核验的正文、图表和参考文献线索，生成阅读地图与证据清单。随 bundle 内置于 skills/kb-evidence-scaffold（需配置 MINGXUE_API_TOKEN）。
+
+  - id: mingxue-kb
+    type: plugin
+    label: 明学知识库 · 安全检索连接
+    required: false
+    role: knowledge
+    description: 为明学知识库提供凭据隔离的只读 MCP 检索工具；token 只注入独立 MCP 进程，不进入通用 shell、对话或产物。
 
   - id: topic-mining
     type: skill
@@ -49,7 +56,7 @@ capabilities:
     label: 撰写与修订辅助
     required: false
     role: writing
-    description: 用提纲/思路/问题清单/句式骨架支架学生写作，按六维质量标准检查初稿，绝不代写整篇或大段正文。随 bundle 内置于 skills/report-writing。
+    description: 用提纲、思路、问题清单和句式骨架辅助写作，按六维质量标准检查初稿并给出修改优先级。随 bundle 内置于 skills/report-writing。
 
 policies:
   response_style: scaffold_not_ghostwrite
@@ -60,6 +67,6 @@ policies:
 entry_prompts:
   - 我要写《XX 课程》的报告，但还没想好选题。这是课程要求/我感兴趣的方向，帮我挖几个有自主性、不趋同的选题候选。
   - 围绕「<我的选题>」帮我导读 5 篇关键文献，给出可核实来源、各自的核心观点和我该重点读的部分。
-  - 这是我报告的初稿（已上传），按创新性/数据分析深度/完整性/文献引用/结论合理性/格式规范性六个维度，指出问题和提升点——但不要替我改写。
+  - 这是我报告的初稿（已上传），请按六个质量维度指出问题、提升点和修改优先级。
   - 我这段数据分析卡住了，帮我理清该用什么方法、怎么验证，并给我能看懂的示例代码，别直接给结论。
-  - 我想让你直接帮我把第三章写出来。
+  - 我已经写了第三章，帮我检查论点、证据和结构是否完整。

@@ -1,10 +1,6 @@
 ---
 name: report-pdf-export
 description: Export a finished course-report evaluation as a tidy, print-ready PDF — one file per report. Read this skill WHENEVER the teacher, after an evaluation has been produced (六维评分 / 增量评价 / 讲解答辩一致性核验), asks for a 完整规整的报告、导出 PDF、"pdf 吧"、可打印/可下发的评价报告 (and by default whenever an evaluation deliverable is produced). You build a small JSON from the evaluation you already produced and run the renderer; it lays out title, meta, sections, score tables and the ability radar into a clean A4 PDF. Chinese fonts are handled automatically (embeds an OS CJK font, falls back to a built-in one). Write ONLY to /mnt/user-data/outputs/ and name the file after the report/课题 title (报告标题-课程报告评价.pdf), never after student names. Do NOT invent scores or findings here — only render what the evaluation already established.
-version: "1.0.0"
-author: allo-official
-required_env: []
-optional_env: []
 ---
 
 # Course-Report PDF Export (评价报告导出 PDF)
@@ -162,5 +158,6 @@ per-dimension targets.
 
 This skill renders; it never grades. Every score, table row and coverage note must come
 from an evaluation already produced by the other skills — do not add or soften anything at
-render time. Keep the report **objective and constructive**: state facts and improvement
-suggestions; **never** render 代写/作弊/真实性 accusations.
+render time. Keep the report **objective and constructive**: state facts, evidence, coverage,
+and improvement suggestions in neutral language. The renderer applies a final visible-language
+normalization pass so deprecated personal-process labels cannot leak into the PDF.

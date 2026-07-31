@@ -32,12 +32,18 @@ capabilities:
     required: false
     role: knowledge
     description: 用明学 RAGFlow 知识库（电池/储能/SOC/SOH 等）做选题文献支撑，并在评审“文献引用/数据分析”维度时核查学生引用是否真实、是否支撑结论（随包 skill：skills/kb-citation-verifier，需配置 MINGXUE_API_TOKEN）。
+  - id: mingxue-kb
+    type: plugin
+    label: 明学知识库 · 安全检索连接
+    required: false
+    role: knowledge
+    description: 为明学知识库提供凭据隔离的只读 MCP 检索工具；token 只注入独立 MCP 进程，不进入通用 shell、对话或评价产物。
   - id: draft-and-revision-coach
     type: skill
     label: 撰写与修订辅导
     required: false
     role: writing
-    description: 生成课程报告提纲、分节写作建议、修改优先级和可替换改写示例，避免只做语言润色（随包 skill：skills/draft-and-revision-coach）。
+    description: 生成课程报告提纲、分节写作建议、修改优先级和带空白位的局部结构示范，帮助用户根据现有材料完成修订（随包 skill：skills/draft-and-revision-coach）。
   - id: six-dimension-evaluation
     type: review
     label: 六维评分与量规评价
@@ -55,7 +61,7 @@ capabilities:
     label: 讲解答辩视频评价
     required: false
     role: assessment
-    description: 处理学生的课程报告讲解/答辩录像，映射到口头可考察的六维（创新性/数据分析深度/结论合理性）作为客观口头佐证，并结合书面报告做“报告↔讲解覆盖对照”（讲解覆盖/偏薄/未提哪些要点，客观参考、正向表述，不做代写判断；随包 skill：skills/report-presentation-review，调用 Allo 视频理解服务）。
+    description: 处理学生的课程报告讲解/答辩录像，用时间戳证据辅助评价创新性、数据分析深度和结论合理性，并客观对照书面报告要点的讲解覆盖情况（随包 skill：skills/report-presentation-review，调用 Allo 视频理解服务）。
   - id: report-pdf-export
     type: skill
     label: 评价报告导出 PDF
@@ -71,7 +77,7 @@ capabilities:
 policies:
   grounding: 缺少材料时，不编造课程事实、学生成绩、实验数据、引用来源、学校要求或教师评价标准。
   evidence: 评价必须说明依据，区分有证据支持的判断、合理推测和待教师确认内容。
-  learning: 不替学生隐藏 AI 参与，不鼓励直接提交未经理解的 AI 生成文本。
+  learning: 记录并说明 AI 参与环节，评价聚焦材料中可观察的思考、证据与修订过程。
   teacher_authority: 教学助手只提供评价参考和修改建议，不替代教师正式评分或最终教学判断。
 entry_prompts:
   - 帮我根据课程要求和可用材料，推荐 3 个课程报告选题，并分析创新性、可行性和数据可得性。
@@ -79,5 +85,5 @@ entry_prompts:
   - 请根据课程要求生成课程报告提纲，并标注每一节需要的证据和反思点。
   - 请按六维评分模型评审这份初稿，给出优先修改建议和待补充材料。
   - 请对比初稿和终稿，生成增量评价、成长证据链、风险提示和反思问题。
-  - 这是学生的报告讲解录像，请评价讲解并和书面报告做一致性核验，看是否本人真实理解。
+  - 这是学生的报告讲解录像，请评价讲解，并客观核对书面报告的关键要点在讲解中是充分覆盖、简要提及还是未提及。
   - 请帮我生成教师参考评语，并列出适合追问学生的 5 个问题。

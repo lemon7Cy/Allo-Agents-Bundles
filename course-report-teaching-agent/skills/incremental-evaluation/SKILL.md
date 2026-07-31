@@ -1,14 +1,12 @@
 ---
 name: incremental-evaluation
 description: 'Read this skill when the user wants to "review a course report," "score on the six dimensions," "compare the first draft and final draft," or "generate an incremental evaluation / radar chart." It turns the six-dimension evaluation from "just talk" into something "visualized and verifiable" — you (the LLM) score each draft on the six dimensions per the rubric and write the justification, while the script draws the radar chart and computes the increments. The core is incremental evaluation: it looks at the real improvement from first draft to final draft (sidestepping "was this written by AI").'
-version: "1.0.0"
-author: allo-official
 ---
 
-# Six-Dimension Incremental Evaluation (the reviewer's killer feature)
+# Six-Dimension Incremental Evaluation
 
 ## What this skill solves
-The pain point of evaluating course reports is "you can't tell a student's real level vs. AI ghostwriting." What this skill scores is **not the absolute quality of any single draft, but the "increment" from first draft → final draft** — a large increment backed by an evidence chain means the student genuinely learned and improved while collaborating with AI; a hollow increment or mere polishing means the understanding didn't deepen. This is exactly the incremental evaluation philosophy of 明学慧评.
+This skill compares **observable changes from first draft → final draft** rather than relying only on the polish of a single product. A strong increment is one backed by concrete changes in decisions, evidence, methods, analysis, citation closure, boundaries, and reflection. A language-only change is reported as language improvement, not automatically as deeper learning. The teacher retains the judgment about the learner.
 
 ## Division of responsibility (hard rules)
 - **You (the LLM) make the judgment**: read the drafts, score **each draft** 0–100 on the six-dimension rubric below, and write one sentence of **justification** per dimension. Judgments must be grounded — distinguish "supported by evidence," "reasonable inference," and "pending teacher confirmation"; do not fabricate when material is missing.
@@ -52,13 +50,13 @@ Dependency: `matplotlib` (see requirements.txt); the table still works without i
 Based on the increment table + radar chart, produce:
 - **Increment highlights**: which dimensions improved the most + the corresponding growth evidence (cite specific changes in the final draft).
 - **Remaining risks**: which dimensions are still weak, and what the final draft still lacks.
-- **Reference comments for the teacher** + **3–5 questions to ask the student** (to help confirm and deepen the student's understanding).
+- **Reference comments for the teacher** + **3–5 questions to ask the student** (to elicit missing reasoning, verify evidence choices, and guide the next revision).
 
 ## Optional: AI baseline comparison (a constructive "how far beyond the AI baseline" reference)
 In addition to "初稿 vs 终稿," you can add a third series 「AI独立解法」 — have the agent independently produce a version of the same topic and compare it against the "student + AI final draft." If the student's final draft **exceeds** the AI's independent solution on some dimensions, that highlights where the student added real value beyond the tool. Usage: just add one more entry `"AI独立解法": [...]` to `series`, and the script will draw it into the radar chart as well.
 
 ## Optional: presentation/defense video (objective oral corroboration)
-When a report presentation/defense recording is available, the `report-presentation-review` skill provides an **objective oral corroboration** and a **report↔讲解 coverage comparison**. Use its `report_video_consistency` (covered/thin/absent, 客观参考) together with this increment and the AI baseline as extra evidence for the orally-assessable dimensions — e.g. 讲解充分复述了核心方法 → 强佐证;某要点讲解未展开 → 建议答辩补充。Describe facts and suggest improvements; **never** infer 代写/作弊. The video is an objective corroboration layer, **not** a seventh rubric dimension — the six-dimension scores still come from `rubric.md`.
+When a report presentation/defense recording is available, the `report-presentation-review` skill provides an **objective oral corroboration** and a **report↔讲解 coverage comparison**. Use its `report_video_consistency` (covered/thin/absent, 客观参考) together with this increment and the AI baseline as extra evidence for the orally-assessable dimensions — e.g. 讲解充分复述了核心方法 → 强佐证;某要点讲解未展开 → 建议答辩补充。Describe facts and suggest improvements in neutral task/evidence language. The video is an objective corroboration layer, **not** a seventh rubric dimension — the six-dimension scores still come from `rubric.md`.
 
 ## Example
 Under `examples/` there is a synthetic sample (topic + first draft + final draft + sample-scores.json), which you can run directly. ⚠️ The `examples/*.json` score files are **rendering demos, not scoring gold standards** — when you actually score a report, derive every number from `rubric.md` (its band anchors and hard-deduction checks), never by imitating the demo numbers:

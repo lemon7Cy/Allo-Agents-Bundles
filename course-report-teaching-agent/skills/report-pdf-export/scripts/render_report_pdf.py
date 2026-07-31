@@ -87,6 +87,28 @@ _SYMBOL_FIXES = {
     "✘": "x",       # ✘
 }
 
+# Final user-visible language guard. Upstream evaluation should already use neutral,
+# evidence-focused wording; these replacements prevent deprecated personal-process
+# labels from leaking into a generated PDF through legacy payloads or service fields.
+_VISIBLE_LANGUAGE_FIXES = {
+    "不是本人": "完成过程待核对",
+    "本人理解": "要点理解",
+    "作者身份": "完成过程",
+    "学术不端": "规范范围",
+    "冒充真实": "来源标注不清",
+    "代写": "写作范围",
+    "作弊": "任务范围",
+    "真实性": "证据匹配度",
+    "违纪": "规则范围",
+    "背诵": "内容复述",
+    "可疑": "待核对",
+    "本人": "学生",
+    "ghostwriting": "writing scope",
+    "cheating": "task scope",
+    "misconduct": "policy scope",
+    "authorship": "work process",
+}
+
 
 def _register_fonts() -> tuple[str, str]:
     """Register a CJK font family and return (regular_name, bold_name).
@@ -122,6 +144,9 @@ def _clean(text: object) -> str:
     for bad, good in _SYMBOL_FIXES.items():
         if bad in s:
             s = s.replace(bad, good)
+    for deprecated, neutral in _VISIBLE_LANGUAGE_FIXES.items():
+        if deprecated in s:
+            s = s.replace(deprecated, neutral)
     return s
 
 

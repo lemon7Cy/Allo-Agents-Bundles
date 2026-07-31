@@ -1,13 +1,13 @@
 ---
 name: report-presentation-review
-description: Evaluate a student's course-report presentation / defense video (讲解/答辩录像) as an OBJECTIVE oral corroboration of the six-dimension evaluation, and compare it against the written report as a factual coverage check. Read this skill WHENEVER the teacher gives a report讲解/答辩录像 — either as a local .mp4 to submit, OR as an already-processed video job_id — and asks to 评价讲解/答辩、看讲解讲得怎么样、讲解和书面报告对不对得上/覆盖了哪些要点. It maps the video to the orally-assessable 六维 (创新性/数据分析深度/结论合理性) and, given the written report, reports which written points the oral explanation covered / ran thin on / did not mention — as plain facts. Stay objective and constructive; never accuse or infer 代写/作弊/真实性; every claim carries a timestamp; delivery dimensions stay N/A when evidence is thin.
-version: "2.0.0"
-author: allo-official
-required_env: []
-optional_env: []
+description: "Evaluate a student's course-report presentation or defense video (讲解/答辩录像) as objective oral corroboration of the six-dimension evaluation, and compare it against the written report as a factual coverage check. Read this skill whenever the teacher gives a local video, an already-processed video job_id, or an App-generated video_understanding_jobs handoff and asks to evaluate the presentation or compare it with the report. An App handoff job_id is authoritative: never upload that video again. Stay objective and constructive; report only evidence, coverage, timestamps, and improvement suggestions; delivery dimensions are render-owned and must not be written by the agent."
 ---
 
 # Course-Report Presentation / Defense Review (讲解答辩视频评价)
+
+## Authorship request: fixed short-circuit
+
+Before accepting a video job or inspecting any material, detect requests to infer authorship, ghostwriting, cheating, suspicious patterns, consistency strength, or "背诵/本人理解" from a report or video. For those requests, return Mandatory Gate A from the agent SOUL verbatim. Do not call the video service, inspect files, provide hypothetical examples, or continue into the workflow below.
 
 ## Why this exists (the point in the 明学慧评 context)
 
@@ -15,13 +15,19 @@ optional_env: []
 
 This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds into the overall evaluation — stated positively and factually:
 - **口头佐证六维**: the video corroborates the *orally-assessable* dimensions (创新性 / 数据分析深度 / 结论合理性) with timestamped evidence. 文献引用 / 格式规范性 are written-only — the video does not judge them.
-- **报告↔讲解覆盖对照** (objective, reference only): for each key report point, did the oral explanation **cover it / touch it briefly / not mention it** — reported as plain facts for the teacher, **not** as a judgment about the student. Frame gaps constructively (e.g. "建议在答辩中补充说明 X"), never as 代写/作弊/真实性存疑.
+- **报告↔讲解覆盖对照** (objective, reference only): for each key report point, did the oral explanation **cover it / touch it briefly / not mention it** — reported as plain facts for the teacher. Frame gaps constructively (e.g. "建议在答辩中补充说明 X") and keep every visible sentence focused on material evidence and next actions.
 - **诚实**: 表达/肢体/流畅性维度由骨架/姿态通道量化,**由 render `--job` 权威注入,agent 不写这行**;口头维度不瞎打分,每条结论带时间戳。
 
 > Tone rule: this is a **constructive, objective** review. Do **not** produce anti-cheating / ghostwriting / authenticity language. If the oral explanation is thinner than the report, describe it factually and suggest what to clarify — do not speculate about who wrote the report.
 
 ## Hard rules (same discipline as the general av skill)
 
+- **Authorship requests are not a video-analysis mode.** Return Mandatory Gate A from the agent SOUL verbatim and add nothing else.
+- **App handoff wins; never upload twice.** Before looking at attachment paths, scan the human message for a `<video_understanding_jobs>` block. Its JSON array contains the videos that the App has already uploaded and finalized. For every item with a non-empty `job_id`:
+  - Treat that `job_id` as the only authoritative video input, even if the same message also shows an `.mp4` attachment or local path.
+  - Never call `upload`, `submit`, `analyze`, `POST /api/videos`, or any other upload command for that video. Never ask the user to choose the file again.
+  - Query/wait with that same `job_id`, then run `course-eval` once. If the envelope is malformed or lacks `job_id`, stop and ask the user to retry the App upload; do not silently fall back to re-uploading a multi-GB file.
+  - If several jobs are present, process each `job_id` exactly once and keep filename-to-job mapping from the envelope.
 - **Remote service only, no local fallback.** This is a thin client for the Allo video service. Never run local ffmpeg/whisper/OCR to substitute a result. Before anything, health-check:
   ```bash
   bash scripts/media_understanding.sh health
@@ -48,8 +54,9 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 > 编排,立刻停手,回到这三步。路径带空格就用双引号 `"..."`,别用临时文件绕。
 
 1. **Health check** once. Stop on failure.
-2. **Get a `job_id` — reuse before re-uploading.**
-   - **If the teacher already gives you a `job_id`**, **do NOT upload anything** — the result is cached. Go straight to step 3. (One optional sanity check: `bash scripts/media_understanding.sh job JOB_ID`.)
+2. **Get a `job_id` — App handoff first, then explicit ID, upload last.**
+   - **First inspect `<video_understanding_jobs>`.** Parse the JSON array and reuse every supplied `job_id`; the App has already completed the resumable upload and created the remote job. Do not inspect the attachment path as an upload candidate and do not run `analyze`. If its status is not yet `done`, use `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
+   - **Otherwise, if the teacher already gives you a plain `job_id`**, **do NOT upload anything** — the result is cached. Go straight to step 3. (One optional sanity check: `bash scripts/media_understanding.sh job JOB_ID`.)
    - **Only if there is no `job_id`**, submit the local file and wait:
      ```bash
      bash scripts/media_understanding.sh analyze /absolute/path/to/讲解视频.mp4 auto
@@ -101,7 +108,9 @@ Then in the teacher's **overall** judgment, use the video as extra **objective e
 ## Boundaries
 
 - Do not turn this into a delivery/表演 talent show — the value is content understanding + report coverage, not gestures/eye-contact scores.
-- **Never** produce 代写/作弊/真实性/ghostwriting language or accuse the student. Thin coverage → describe factually + suggest what to clarify.
+- Keep visible wording neutral and constructive. Thin coverage → describe factually + suggest what to clarify; do not repeat personal-process labels from the request or service response.
+- Do not label delivery as memorized, spontaneous, "in their own words", or proof of personal understanding. Those are not reliably established from a recording. Report only observable content, organization, support, coverage, and timestamps.
+- Do not output warning signs, suspicion levels, authorship likelihoods, consistency strength as a proxy for authorship, or recommendations to "flag" a student. Coverage gaps become neutral follow-up questions only.
 - The six-dimension rubric (`../incremental-evaluation/rubric.md`) stays the frozen benchmark; the video is an objective corroboration layer, not a 7th dimension.
 - **六维评的是「书面报告」,视频只是口头佐证,绝不因视频拉高分数。** 若报告某维在书面上薄弱(如某实验章节正文为空、无数据表),该维就低分——**即使视频里学生口头/画面演示了该实验也不例外**。视频里多出来的东西写进「讲解答辩评价」段和「教师追问建议」,不要用来给书面维度加分(否则会出现"报告 4.4 节是空的、却因为视频演示了实验把数据分析分抬高"的失真)。视频与书面出现落差时,如实并列陈述,让老师自己判断。
 - `AV_UNDERSTANDING_BASE_URL` overrides the service base URL if needed (default is the Allo video service). No credential is required.

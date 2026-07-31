@@ -1,0 +1,47 @@
+{
+  "name": "mingxue-kb",
+  "version": "1.0.0",
+  "description": "明学课程知识库的安全只读检索工具，提供论文、教材与课件证据，不向通用 shell 暴露 token。",
+  "author": "allo-official",
+  "type": "mcp",
+  "command": {
+    "command": "python",
+    "args": [
+      "-u",
+      ".deer-flow/agents/course-report-teaching-agent/mcp/mingxue_search_server.py"
+    ],
+    "env": {
+      "MINGXUE_API_TOKEN": "$MINGXUE_API_TOKEN"
+    }
+  },
+  "tools": [
+    {
+      "name": "mingxue_search",
+      "description": "按聚焦问题检索明学知识库，返回正文片段、图表线索与参考文献线索。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "question": {"type": "string"},
+          "top_k": {"type": "integer", "minimum": 1, "maximum": 8},
+          "mode": {"type": "string", "enum": ["answer", "research"]},
+          "include_assets": {"type": "boolean"},
+          "dataset": {"type": "string", "enum": ["论文", "教材", "课件", "数据"]}
+        },
+        "required": ["question"]
+      }
+    }
+  ],
+  "permissions": ["network", "knowledge-base-read"],
+  "required_env": ["MINGXUE_API_TOKEN"],
+  "optional_env": [],
+  "credentials": [
+    {
+      "key": "MINGXUE_API_TOKEN",
+      "label": "明学知识库 API Token",
+      "description": "由管理员预配置，用于明学知识库只读检索。",
+      "required": true,
+      "secret": true
+    }
+  ],
+  "source": "bundle"
+}

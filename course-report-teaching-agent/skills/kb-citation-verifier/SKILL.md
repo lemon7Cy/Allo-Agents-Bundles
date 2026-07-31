@@ -1,18 +1,6 @@
 ---
 name: kb-citation-verifier
 description: Use the 明学 knowledge base (battery/储能/SOC/SOH/RUL/Kalman/BMS, etc.) to obtain real literature evidence for teaching and evaluation — literature support for topic selection, verifying whether student citations are real / whether they support the conclusion, and using paper figures/tables to corroborate methods and data. Read this skill when recommending topics, building the corpus, or reviewing the "文献引用/数据分析" dimensions. Never fabricate.
-tools: []
-version: "1.0.0"
-author: allo-official
-required_env:
-  - MINGXUE_API_TOKEN
-optional_env: []
-credentials:
-  - key: MINGXUE_API_TOKEN
-    label: 明学知识库 API Token
-    description: 用于查询明学 RAGFlow 知识库的认证 token。
-    required: true
-    secret: true
 ---
 
 # 明学 Knowledge Base · Literature Foundation + Citation Verifier (Teacher Side)
@@ -28,12 +16,13 @@ The 明学 base covers **lithium battery / 储能 / SOC / SOH / RUL / capacity f
 3. **reference_signals (references)**: returned by `research` mode → **the primary channel for verifying citations**.
 
 ## How to Call
-```bash
-curl -sS -X POST "http://221.0.79.251:18091/api/search" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $MINGXUE_API_TOKEN" \
-  -d '{"question": "focused search question", "top_k": 5, "mode": "research", "include_assets": true, "dataset": "论文"}'
+Call the tool provided by the bundled `mingxue-kb` plugin (its visible name contains `mingxue_search`; runtimes may prefix the server name). Never call the REST endpoint through generic `bash`, because Web execution intentionally does not expose capability credentials to a shell.
+
+Arguments example:
+```json
+{"question":"学生引用的论文标题或待核查观点","top_k":5,"mode":"research","include_assets":true,"dataset":"论文"}
 ```
+- **Call budget / backpressure:** make exactly one Mingxue call at a time; never dispatch parallel Mingxue searches. Verify the highest-risk citation or claim first with `top_k: 4-5`. Make one additional focused call only when the first result leaves a material ambiguity. For a batch of citations, process sequentially and stop once the evidence state is clear; do not launch near-duplicate searches in parallel.
 - For citation verification use `mode: research` (preserves citation signals); for finding method/data evidence use `answer`. A Chinese query automatically searches English papers cross-lingually.
 - **`dataset` (which 明学 library to verify against — pick by the check; optional):**
   - `论文` (**default** if omitted) — verify the student's **citations** against real research papers. This is the primary channel for citation verification.
@@ -54,7 +43,7 @@ Corresponding to the five citation-risk points in `literature-and-knowledge-guid
 ## Iron Rules
 - **Never fabricate**: only trust documents actually returned by the 明学 base; if verification fails, mark "待核实" — don't make things up for the student, and don't paper over gaps for them.
 - In the evaluation conclusion, distinguish three states: **库里有据** / **库里查不到** / **库里证据相反**.
-- **Do not print or leak the token.**
+- **Never print, echo, slice, count, inspect, or test the token/environment variable.** Do not run commands such as `echo $MINGXUE_API_TOKEN`, `${#MINGXUE_API_TOKEN}`, `env`, or `printenv`. Determine availability only from the MCP tool result. If the tool is absent or reports authentication failure, say the administrator must check the preconfigured credential and mark the citation as externally pending verification.
 
 ## Output (evaluation-evidence snippet)
 ```

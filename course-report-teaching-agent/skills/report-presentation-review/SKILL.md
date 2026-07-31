@@ -26,9 +26,11 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 - **App handoff wins; never upload twice.** Before looking at attachment paths, scan the human message for a `<video_understanding_jobs>` block. Its JSON array contains the videos that the App has already uploaded and finalized. For every item with a non-empty `job_id`:
   - Treat that `job_id` as the only authoritative video input, even if the same message also shows an `.mp4` attachment or local path.
   - Never call `upload`, `submit`, `analyze`, `POST /api/videos`, or any other upload command for that video. Never ask the user to choose the file again.
-  - Query/wait with that same `job_id`, then run `course-eval` once. If the envelope is malformed or lacks `job_id`, stop and ask the user to retry the App upload; do not silently fall back to re-uploading a multi-GB file.
+  - Query/wait with that same `job_id`, then run `course-eval` once.
   - If several jobs are present, process each `job_id` exactly once and keep filename-to-job mapping from the envelope.
-- **Remote service only, no local fallback.** This is a thin client for the Allo video service. Never run local ffmpeg/whisper/OCR to substitute a result. Before anything, health-check:
+- **Malformed App handoff is a zero-tool hard stop.** If `<video_understanding_jobs>` is invalid JSON, is not an array, or contains no non-empty `job_id`, do not inspect files, health-check, list/query jobs, print script usage, inspect caches, or call any other tool. Reply only: `App 视频任务信息不完整，缺少有效 job_id。请在 App 中重试本次上传或恢复任务；收到新的 handoff 后我会继续。为避免重复传输大文件，我不会在 Agent 侧重新上传。`
+- **Never inspect runtime configuration or credentials.** Do not run `env`, `printenv`, `set`, `export -p`, inspect `/proc/*/environ`, grep environment variables, or print/echo/test any token, key, secret, service URL, or credential-related variable. Determine video-service availability only through the provided script's normal `health` result after a valid video input has been established.
+- **Remote service only, no local fallback.** This is a thin client for the Allo video service. Never run local ffmpeg/whisper/OCR to substitute a result. After resolving a valid video input, health-check:
   ```bash
   bash scripts/media_understanding.sh health
   ```
@@ -53,21 +55,22 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 > `course-eval` → (读 `gallery_block.json`)→ `render_report_pdf.py --job`。发现自己在写脚本
 > 编排,立刻停手,回到这三步。路径带空格就用双引号 `"..."`,别用临时文件绕。
 
-1. **Health check** once. Stop on failure.
-2. **Get a `job_id` — App handoff first, then explicit ID, upload last.**
-   - **First inspect `<video_understanding_jobs>`.** Parse the JSON array and reuse every supplied `job_id`; the App has already completed the resumable upload and created the remote job. Do not inspect the attachment path as an upload candidate and do not run `analyze`. If its status is not yet `done`, use `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
-   - **Otherwise, if the teacher already gives you a plain `job_id`**, **do NOT upload anything** — the result is cached. Go straight to step 3. (One optional sanity check: `bash scripts/media_understanding.sh job JOB_ID`.)
+1. **Resolve the video input without tools.** First inspect `<video_understanding_jobs>`. Parse its JSON array and collect every non-empty `job_id`. If parsing fails or none exists, return the fixed malformed-handoff reply above and stop with zero tool calls.
+2. **Health check** once, but only after step 1 produced a valid App `job_id`, the teacher supplied a plain `job_id`, or a local video path exists. Stop on failure.
+3. **Get a `job_id` — App handoff first, then explicit ID, upload last.**
+   - **For a valid `<video_understanding_jobs>` block**, reuse every supplied `job_id`; the App has already completed the resumable upload and created the remote job. Do not inspect the attachment path as an upload candidate and do not run `analyze`. If its status is not yet `done`, use `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
+   - **Otherwise, if the teacher already gives you a plain `job_id`**, **do NOT upload anything** — the result is cached. Go straight to step 4. (One optional sanity check: `bash scripts/media_understanding.sh job JOB_ID`.)
    - **Only if there is no `job_id`**, submit the local file and wait:
      ```bash
      bash scripts/media_understanding.sh analyze /absolute/path/to/讲解视频.mp4 auto
      ```
      On a foreground timeout, resume: `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
-3. **Run course-eval ONCE, passing the written report** — this is the whole data call:
+4. **Run course-eval ONCE, passing the written report** — this is the whole data call:
    ```bash
    bash scripts/media_understanding.sh course-eval JOB_ID /absolute/path/to/report.txt
    ```
    (Omit the file to skip the coverage comparison and only get the video-side evaluation.)
-4. **ALWAYS write the evaluation as a visible chat reply — this is the deliverable.**
+5. **ALWAYS write the evaluation as a visible chat reply — this is the deliverable.**
    - Fold the `course-eval` result into the 讲解答辩评价段 (see Output) and **output the full text directly in the conversation.** The teacher must see it in chat.
    - Saving a `讲解答辩评价.md` file via `write_file` + `present_files` is **optional and secondary**. **Never end your turn with only a file and no chat text** — that shows up as "执行完成但没有输出" and is a failure. If you save a file, still give the summary in chat.
    - If a step is slow, first say one line ("已读到 job_id、视频 done,正在评价…") so the user isn't left staring at a blank run.

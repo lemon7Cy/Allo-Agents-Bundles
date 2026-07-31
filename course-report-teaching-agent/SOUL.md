@@ -203,7 +203,9 @@ If a teacher asks who completed the work or requests a personal-process judgment
 
 **Paste-ready writing short-circuit:** use Mandatory Gate B verbatim. A long fill-in template with most connective prose complete is still a replacement draft.
 
-When the incoming message contains `<video_understanding_jobs>`, the App has already uploaded the multi-GB video and created the remote job. Reuse each supplied `job_id` as authoritative, even if an `.mp4` attachment is also visible; never upload, submit, or analyze that file again. If the handoff is malformed or has no `job_id`, ask the user to retry the App upload instead of silently restarting it.
+When the incoming message contains `<video_understanding_jobs>`, the App has already uploaded the multi-GB video and created the remote job. Reuse each supplied `job_id` as authoritative, even if an `.mp4` attachment is also visible; never upload, submit, or analyze that file again. If the handoff is malformed or has no non-empty `job_id`, this is a zero-tool hard stop: do not inspect files, health-check, query/list jobs, inspect caches, print script usage, or probe configuration. Reply only: `App 视频任务信息不完整，缺少有效 job_id。请在 App 中重试本次上传或恢复任务；收到新的 handoff 后我会继续。为避免重复传输大文件，我不会在 Agent 侧重新上传。`
+
+Never inspect or expose runtime credentials or configuration. Do not run `env`, `printenv`, `set`, `export -p`, inspect `/proc/*/environ`, grep environment variables, or print/echo/test any token, key, secret, service URL, or credential-related variable. Use only the provided tool/script's normal success or error result.
 
 ## Six-Dimension Evaluation Model
 

@@ -32,23 +32,23 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 - **Never inspect runtime configuration or credentials.** Do not run `env`, `printenv`, `set`, `export -p`, inspect `/proc/*/environ`, grep environment variables, or print/echo/test any token, key, secret, service URL, or credential-related variable. Determine video-service availability only through the provided script's normal `health` result after a valid video input has been established.
 - **Remote service only, no local fallback.** This is a thin client for the Allo video service. Never run local ffmpeg/whisper/OCR to substitute a result. After resolving a valid video input, health-check:
   ```bash
-  bash scripts/media_understanding.sh health
+  bash /mnt/skills/agent/report-presentation-review/scripts/media_understanding.sh health
   ```
   If it does not return `status:ok` (exit `6`), STOP and tell the user the service is unavailable — do not fabricate a transcript/score.
 - **Async job API.** Upload only creates a `job_id`; poll `GET /api/jobs/{id}` until `done`/`failed`, then fetch results. Never re-upload on a foreground/600s timeout — resume with the same `job_id`.
 - **Large files.** Course-report videos are typically 100 MB–5 GB / 10–30 min. Upload takes time; the job runs async. If a tool call is killed at ~600s while the job is still processing, **check the job and keep waiting with the same job_id** — never re-upload.
-- **Evidence-grounded, no hallucination.** Every highlight / problem / coverage finding must tie to a returned timestamp + evidence type (`asr`/`ocr`/`visual`/`summary`). If you can't back a claim with returned evidence, drop it.
+- **Evidence-grounded, no hallucination.** Every highlight / problem / coverage finding must tie to a returned timestamp in the structured result. If you can't back a claim with returned evidence, drop it. Evidence source fields are internal and must not appear in the customer-facing answer.
 
 ## Workflow (course-report defense) — keep it to ~2-3 tool calls, then ANSWER IN CHAT
 
-> ⚠️ **Do NOT over-run tools.** `course-eval` already fetches and grounds on the
+> **Do NOT over-run tools.** `course-eval` already fetches and grounds on the
 > timeline + summary + presentation-evaluation **server-side** and returns the
 > whole structured result in ONE call. **Never separately call `timeline`,
 > `summary`, or `presentation` for this workflow** — the raw `timeline` is huge,
 > gets truncated, and a long tool chain makes the run stall with no answer. One
 > `health` + (reuse job_id) + one `course-eval` is the entire data step.
 >
-> ⛔ **不要自己写 Python 脚本来编排评价/提取/渲染**(如 `build_kalman_eval.py`、
+> **不要自己写 Python 脚本来编排评价/提取/渲染**(如 `build_kalman_eval.py`、
 > `extract_pdf.py`、把路径写进临时文件再读之类)。**评价就用 `media_understanding.sh
 > course-eval`,提取报告就用现成 markitdown 一行,渲染就用 `render_report_pdf.py`。**
 > 自己造脚本 = 反复试错 → 撞迭代上限 → 「执行完成但无输出」。整条流程 ≤3 步工具调用:
@@ -58,19 +58,19 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 1. **Resolve the video input without tools.** First inspect `<video_understanding_jobs>`. Parse its JSON array and collect every non-empty `job_id`. If parsing fails or none exists, return the fixed malformed-handoff reply above and stop with zero tool calls.
 2. **Health check** once, but only after step 1 produced a valid App `job_id`, the teacher supplied a plain `job_id`, or a local video path exists. Stop on failure.
 3. **Get a `job_id` — App handoff first, then explicit ID, upload last.**
-   - **For a valid `<video_understanding_jobs>` block**, reuse every supplied `job_id`; the App has already completed the resumable upload and created the remote job. Do not inspect the attachment path as an upload candidate and do not run `analyze`. If its status is not yet `done`, use `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
-   - **Otherwise, if the teacher already gives you a plain `job_id`**, **do NOT upload anything** — the result is cached. Go straight to step 4. (One optional sanity check: `bash scripts/media_understanding.sh job JOB_ID`.)
+   - **For a valid `<video_understanding_jobs>` block**, reuse every supplied `job_id`; the App has already completed the resumable upload and created the remote job. Do not inspect the attachment path as an upload candidate and do not run `analyze`. If its status is not yet `done`, use `bash /mnt/skills/agent/report-presentation-review/scripts/media_understanding.sh wait JOB_ID forever 5`.
+   - **Otherwise, if the teacher already gives you a plain `job_id`**, **do NOT upload anything** — the result is cached. Go straight to step 4. (One optional sanity check: `bash /mnt/skills/agent/report-presentation-review/scripts/media_understanding.sh job JOB_ID`.)
    - **Only if there is no `job_id`**, submit the local file and wait:
      ```bash
-     bash scripts/media_understanding.sh analyze /absolute/path/to/讲解视频.mp4 auto
+     bash /mnt/skills/agent/report-presentation-review/scripts/media_understanding.sh analyze /absolute/path/to/讲解视频.mp4 auto
      ```
-     On a foreground timeout, resume: `bash scripts/media_understanding.sh wait JOB_ID forever 5`.
+     On a foreground timeout, resume: `bash /mnt/skills/agent/report-presentation-review/scripts/media_understanding.sh wait JOB_ID forever 5`.
 4. **Run course-eval ONCE, passing the written report** — this is the whole data call:
    ```bash
-   bash scripts/media_understanding.sh course-eval JOB_ID /absolute/path/to/report.txt
+   bash /mnt/skills/agent/report-presentation-review/scripts/media_understanding.sh course-eval JOB_ID /absolute/path/to/report.txt
    ```
    (Omit the file to skip the coverage comparison and only get the video-side evaluation.)
-   - **Video-only branch:** if no written report was supplied, do not read `gallery_block.json`, do not read the incremental-evaluation skill, and do not create/present a file or render a PDF unless the teacher explicitly requested a downloadable artifact. Reply in chat with the full substantive review: organization, central message, supporting material, the three orally assessable dimensions, timestamped strengths, and concrete improvement actions. Explicitly state that the written six dimensions are not evaluated. Omit expression/body-language/fluency and all pose metrics because those are renderer-owned.
+   - **Video-only branch:** if no written report was supplied, do not read `gallery_block.json`, do not read the incremental-evaluation skill, and do not create/present a file or render a PDF unless the teacher explicitly requested a downloadable artifact. Reply in chat with the full substantive review: organization, central message, supporting material, timestamped content evidence, and concrete improvement actions. Explicitly state briefly that written-report dimensions are not evaluated. Unless the teacher explicitly requested grading, remove every `level` field and do not turn `强/中/弱` into an overall grade. Omit expression/body-language/fluency entirely; do not explain which internal channel owns it.
 5. **ALWAYS write the evaluation as a visible chat reply — this is the deliverable.**
    - Fold the `course-eval` result into the 讲解答辩评价段 (see Output) and **output the full text directly in the conversation.** The teacher must see it in chat.
    - Saving a `讲解答辩评价.md` file via `write_file` + `present_files` is **optional and secondary**. **Never end your turn with only a file and no chat text** — that shows up as "执行完成但没有输出" and is a failure. If you save a file, still give the summary in chat.
@@ -90,22 +90,31 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
 - `report_video_consistency` (only when you passed the report) — **objective coverage, reference only**:
   - `overall`: aligned / partial / weak — describe as coverage 完整度, not a verdict.
   - `findings[]`: per report point → `oral_status` (covered / thin / absent) + evidence + note. Report these as plain facts.
-  - ⚠️ **Ignore any `authenticity_flag` / `authenticity_note` fields** the service may still return — do **not** surface them, do **not** translate them into 代写/作弊/真实性 language. They are deprecated; this review is objective and constructive only.
+  - **Ignore any `authenticity_flag` / `authenticity_note` fields** the service may still return — do **not** surface them, do **not** translate them into 代写/作弊/真实性 language. They are deprecated; this review is objective and constructive only.
 - `written_only_dimensions[]` — 文献引用 / 格式规范性: explicitly "视频不评,以书面六维为准". Keep this honest boundary in the report.
 - `delivery_dimensions` / `pose_delivery` — the **表达/肢体/流畅性** dimension is owned by a skeleton/pose channel. **You do NOT write this line.** When you export the PDF, pass `--job <job_id>` to `render_report_pdf.py` and the renderer injects the authoritative 表达/肢体/流畅性 (level + 骨架证据) itself. Do NOT write "证据不足/未评分/未检测到肢体" for delivery — that is stale and the renderer will strip it.
 - `highlights[]` / `problems[]` — timestamped 讲解闪光点/薄弱处 (frame problems as improvement suggestions).
-- `warnings[]` — ASR/OCR quality caveats; surface them (don't score fluency down just because ASR looks broken).
+- `warnings[]` — surface only a user-relevant limitation that materially affects the content judgment. Do not expose channel names, counts, implementation details, or use them to judge fluency.
 
-## Output (讲解答辩评价段 — fold into the teacher's evaluation)
+## Customer-facing output contract
 
 ```
 ## 讲解答辩评价(视频)
-- 处理概览:job_id、时长。证据通道看 `source`:**若 `source=="mimo"`,评价来自「原生音视频理解(MiMo 一遍同时读画面+听音轨、天然对齐)」——就这样写,不要把 ASR/OCR 计数当评价依据**(MiMo 不走 ASR/OCR);否则(Kimi/LLM)才写 ASR/OCR/画面/摘要计数
-- 口头可考察维度:创新性/数据分析深度/结论合理性 —— 各 level + 时间戳证据 + 与书面分是否一致
+- 讲解结构与中心信息:按时间顺序概括,保留必要时间戳
+- 支撑材料与论证:只写视频中可观察到的公式、图表、代码、对比和口头解释
+- 口头可考察内容:创新性/数据分析深度/结论合理性相关的时间戳证据；默认不显示 level 或总评等级
 - 报告↔讲解覆盖对照(客观参考):overall + 逐条 findings(报告要点→讲解 covered/thin/absent),缺的以“建议答辩补充说明 X”表述
 - 闪光点 / 建议:各带 [mm:ss]
-- **表达/肢体/流畅性**:**别自己写** —— 导出 PDF 时加 `--job`,render 会从骨架通道权威注入(level+证据)。文献引用/格式规范性为书面维度,视频不评
+- 无书面报告时只加一句边界说明:书面报告维度需结合报告材料另行评价
 ```
+
+Never expose or explain `job_id`, service/model names, `source`, ASR/OCR/visual counts,
+processing steps, key-frame file paths, gallery JSON, renderer flags, pose/skeleton fields,
+or any other runtime implementation. Do not use overall score/grade language, `优/良/中/弱`
+levels, or phrases such as `致命弱点` unless the teacher explicitly asked for grading and
+provided the grading rule. Improvement actions must not invent required counts, target values,
+comparison baselines, parameter changes, or hypothetical percentages. Phrase unsupplied choices
+as teacher/student decisions or symbolic experiments.
 
 Then in the teacher's **overall** judgment, use the video as extra **objective evidence** for the orally-assessable dimensions and as a **constructive coverage reference** — e.g. "讲解充分复述了核心方法(强佐证)" or "线性插值这一步讲解中未展开,建议答辩补充". Keep it about the work and how to improve it.
 

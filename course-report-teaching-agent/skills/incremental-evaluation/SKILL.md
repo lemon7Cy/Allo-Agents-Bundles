@@ -37,6 +37,7 @@ Use this only when the user explicitly asks to score, quantify, compare scores, 
 - Do not convert RMSE into a different metric, invent an acceptance threshold, prescribe a fixed reference count, or name a remembered dataset.
 - Apply the same boundary to examples, suggested experiments, self-checks, and teacher follow-up questions. Use source-provided values or symbolic wording; never invent a concrete initial value, range, comparison count, or target merely to make a question sound specific.
 - Treat filenames only as identifiers. Determine whether a revision is language-only or substantive from the actual content comparison, never from words in the filename.
+- Immediately before replying, scan the final draft-comparison text itself. Remove every numeric literal/range not present in the uploaded drafts or requested rubric, including numbers hidden inside suggested experiments and teacher questions. Replace them with symbolic wording such as `更换初值`, `调整停止条件`, or `增加对照条件`. Do not use checkbox/status glyphs such as `✓`, `✗`, `✅`, `❌`, or `⚠️`.
 - When no acceptance criterion is available, report the observed result and ask for the course/project baseline.
 - Every high-priority issue must remain closed-loop: `material evidence → student action → student self-check → teacher verification`.
 - Video evidence may add timestamped oral corroboration and a coverage comparison, but it must never raise a written-report score.

@@ -241,6 +241,51 @@ def _note_box(text: str, st: dict, avail_width: float) -> Table:
     return box
 
 
+def _text_flowables(text: object, st: dict) -> list:
+    """Render legacy multiline text while preserving paragraph and bullet structure.
+
+    Older evaluation payloads sometimes store an introductory paragraph followed by
+    lines prefixed with ``·`` inside a ``type: text`` block. ReportLab collapses raw
+    newlines, which turns those items into a dense inline paragraph. Keep ordinary
+    text backward-compatible while promoting only line-leading bullet markers to the
+    same bullet style used by structured ``type: bullets`` blocks.
+    """
+    raw = _clean(text).replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not raw:
+        return []
+
+    out: list = []
+    paragraph_lines: list[str] = []
+
+    def flush_paragraph() -> None:
+        if paragraph_lines:
+            out.append(Paragraph(_markup(" ".join(paragraph_lines)), st["body"]))
+            paragraph_lines.clear()
+
+    for raw_line in raw.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            continue
+
+        bullet_text = None
+        for marker in ("· ", "• ", "- ", "* "):
+            if line.startswith(marker):
+                bullet_text = line[len(marker) :].strip()
+                break
+
+        if bullet_text is not None:
+            flush_paragraph()
+            if bullet_text:
+                out.append(Paragraph(_markup(bullet_text), st["bullet"], bulletText="•"))
+            continue
+
+        paragraph_lines.append(line)
+
+    flush_paragraph()
+    return out
+
+
 def _radar_dims(block: dict) -> tuple[list[str], list[float]]:
     """Pull (names, scores) from a radar block. Accepts `dimensions` or `items`,
     each an entry with `name` + `score` (aligned with the scorecard shape)."""
@@ -508,7 +553,7 @@ def _render_block(block: dict, st: dict, avail_width: float) -> list:
         out.append(Spacer(1, 6))
         return out
     if btype in ("paragraph", "text"):
-        return [Paragraph(_markup(block.get("text") or block.get("content", "")), st["body"])]
+        return _text_flowables(block.get("text") or block.get("content", ""), st)
     if btype == "bullets":
         return [Paragraph(_markup(item), st["bullet"], bulletText="•") for item in block.get("items", [])]
     if btype == "table":

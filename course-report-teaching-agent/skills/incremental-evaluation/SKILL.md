@@ -20,7 +20,7 @@ The six dimensions = **创新性、数据分析深度、完整性、文献引用
 ## Evidence boundary for technical judgments
 
 - Use only the uploaded drafts, `rubric.md`, and current-run tool results as factual support.
-- A relative improvement and an absolute error answer different questions. Report both when present, but do not label the absolute value as industry-good/industry-bad unless a current source or teacher criterion supplies that benchmark.
+- A relative improvement and an absolute error answer different questions. Report both when present, but do not restate RMSE as an average per-sample error or label the value as industry-good/industry-bad unless a current source or teacher criterion supplies that benchmark.
 - Do not derive a pass/fail interval from RMSE alone. Do not add a remembered target such as a typical RMSE, a fixed number of references, or a named external dataset unless it appears in the current evidence.
 - When no acceptance criterion is available, say exactly what is observed, state that quality against the course/project target cannot yet be determined, and ask for the missing baseline.
 - Every high-priority issue must stay closed-loop: `material evidence → student action → student self-check → teacher verification`.

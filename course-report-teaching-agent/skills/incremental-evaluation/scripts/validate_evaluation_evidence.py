@@ -76,11 +76,27 @@ def _score_numbers(value: Any) -> set[str]:
     return allowed
 
 
+def _benchmark_issues(value: Any, path: tuple[str, ...] = ()) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            issues.extend(_benchmark_issues(item, path + (str(index),)))
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            next_path = path + (str(key),)
+            if key == "benchmark":
+                issues.append({"path": ".".join(next_path), "kind": "unverified_benchmark", "value": str(item)})
+            else:
+                issues.extend(_benchmark_issues(item, next_path))
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True)
     parser.add_argument("--source", required=True)
     parser.add_argument("--rubric", required=True)
+    parser.add_argument("--allow-benchmark", action="store_true")
     args = parser.parse_args()
 
     try:
@@ -94,6 +110,8 @@ def main() -> int:
     evidence = source + "\n" + rubric
     allowed_numbers = _number_variants(evidence) | _score_numbers(data) | ALLOWED_TEXT_NUMBERS
     issues: list[dict[str, str]] = []
+    if not args.allow_benchmark:
+        issues.extend(_benchmark_issues(data))
 
     for path, text in _walk_strings(data):
         if path and path[0] == "meta":

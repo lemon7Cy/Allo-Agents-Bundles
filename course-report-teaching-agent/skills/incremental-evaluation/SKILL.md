@@ -17,6 +17,14 @@ This skill compares **observable changes from first draft → final draft** rath
 The six dimensions = **创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性**.
 **Before scoring you must read `rubric.md` in this skill's directory** — it has the 0–100 band anchors for each dimension (weak/medium/strong, taken from real samples), plus **6 deep-read hard-deduction items** (data authenticity ↔ conclusion consistency, citation closure, figure-number continuity, cross-section numerical self-consistency, relative vs. absolute metrics, correctness of the evaluation baseline) and difficulty-tiering rules. **Scoring off the top of your head without reading the rubric is not allowed.**
 
+## Evidence boundary for technical judgments
+
+- Use only the uploaded drafts, `rubric.md`, and current-run tool results as factual support.
+- A relative improvement and an absolute error answer different questions. Report both when present, but do not label the absolute value as industry-good/industry-bad unless a current source or teacher criterion supplies that benchmark.
+- Do not derive a pass/fail interval from RMSE alone. Do not add a remembered target such as a typical RMSE, a fixed number of references, or a named external dataset unless it appears in the current evidence.
+- When no acceptance criterion is available, say exactly what is observed, state that quality against the course/project target cannot yet be determined, and ask for the missing baseline.
+- Every high-priority issue must stay closed-loop: `material evidence → student action → student self-check → teacher verification`.
+
 ## Workflow
 
 ### 1. Get the drafts

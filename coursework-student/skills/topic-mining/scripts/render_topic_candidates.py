@@ -36,6 +36,10 @@ INSPECTION_SIGNAL = re.compile(
 )
 DIRECT_OCV_STEP = re.compile(r"从(?:CSV|数据).*拟合.*OCV[-–— ]?SOC|拟合.*OCV[-–— ]?SOC.*(?:CSV|数据)", re.IGNORECASE)
 UNVERIFIED_TRUTH_STEP = re.compile(r"(?:以|将)\s*`?soc_reference`?\s*(?:作为|为)\s*真值", re.IGNORECASE)
+UNVERIFIED_EXTERNAL_SOURCE = re.compile(
+    r"OpenStreetMap|\bOSM\b|\bGTFS\b|Citi\s*Bike|Divvy|公开数据集|开放数据|开源(?:GIS|数据)?平台|交通部门公开|文献值|教材中的?标准案例",
+    re.IGNORECASE,
+)
 
 
 class ValidationError(ValueError):
@@ -160,6 +164,12 @@ def validate(payload: object) -> dict:
                 fallback="当前材料未提供可核依据。",
                 max_length=300,
             )
+            if not inspected and UNVERIFIED_EXTERNAL_SOURCE.search(safe_basis):
+                normalizations.append(f"{label}.data_requirements[{data_index}].basis: removed an unverified external source")
+                if status == "needs-derivation":
+                    safe_basis = "当前材料未提供；需在明确假设和依据后构造，并记录来源与适用范围。"
+                else:
+                    safe_basis = "当前材料未提供来源；需先检索并核验授权、字段、时间范围和可用性。"
             if not inspected and status == "stated-available" and INSPECTION_SIGNAL.search(f"{safe_item} {safe_basis}"):
                 normalizations.append(
                     f"{label}.data_requirements[{data_index}]: downgraded an uninspected property to needs-inspection"
@@ -177,7 +187,10 @@ def validate(payload: object) -> dict:
         )
         if not inspected:
             for step_index, step in enumerate(method_steps):
-                if DIRECT_OCV_STEP.search(step):
+                if UNVERIFIED_EXTERNAL_SOURCE.search(step):
+                    normalizations.append(f"{label}.method_steps: removed an unverified external source")
+                    method_steps[step_index] = "先确定并核验可获取的数据格式、字段、授权和样本范围，再进入建模与分析。"
+                elif DIRECT_OCV_STEP.search(step):
                     normalizations.append(f"{label}.method_steps: replaced direct OCV-SOC derivation from uninspected data")
                     method_steps[step_index] = (
                         "先确认数据是否包含可用于 OCV-SOC 关系识别的静置或低电流片段；否则补充外部曲线或调整该方法。"
@@ -278,7 +291,12 @@ def render(payload: dict) -> tuple[str, str]:
             "",
         ]
     )
-    summary = f"已生成并呈现 `选题候选.md`：共 {len(payload['candidates'])} 个候选，已分别列出课程匹配、数据状态、方法步骤、难度依据、风险和进入条件。"
+    titles = "；".join(candidate["title"] for candidate in payload["candidates"])
+    summary = (
+        f"已整理 {len(payload['candidates'])} 个候选方向：{titles}。"
+        "候选没有预设排名；请先按兴趣和课程覆盖选择一到两个，再核验数据来源与前置条件。"
+        "完整对比已生成到 `选题候选.md`，可直接下载。"
+    )
     return "\n".join(lines), summary
 
 

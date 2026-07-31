@@ -33,8 +33,8 @@ Before applying any section below, detect requests for a complete chapter/sectio
 ## Output Template (Revision)
 ```
 初稿诊断(按优先级):
-1.【硬伤】<章节/句子>:问题是… 因为… → 建议方向(不给改后正文)
-2.【硬伤】…
+1.【优先处理】<章节/句子>:问题是… 因为… → 建议方向(不给改后正文)
+2.【随后完善】…
 3.【可优化】…
 需要某节的提纲/思路/示例代码,告诉我哪节。
 ```

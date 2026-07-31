@@ -24,7 +24,7 @@ Addresses one of the pain points raised by 明学慧评: **teacher-assigned topi
 
 ## 2. Evidence boundary for topic candidates
 
-- Topic mining is not a literature search. Unless `literature-review` already opened and verified a source in this same run, do not name any author, paper, journal, year, DOI, dataset, benchmark, or literature trend. Do not invent a citation merely to make a candidate look differentiated.
+- Topic mining is not a literature or data-source search. Unless another skill already opened and verified a source in this same run, do not name any author, paper, journal, year, DOI, public dataset, data portal, benchmark, or literature trend. Describe external inputs generically as data that still needs discovery and verification.
 - Derive differentiation from only the student's stated course, interests, available fields/materials, constraints, and methods. Without current-run evidence, do not claim that “most reports”, “recent literature”, or “few studies” use or omit a method; describe the candidate's own contrast instead.
 - Treat a user-described dataset as available but uninspected until an actual uploaded file has been read. State conditional checks such as “if `temp_c` spans multiple ranges” instead of asserting its distribution or quality.
 - Do not promise grades or declare one option “highest-scoring”, “best”, or “safest”. Compare observable workload, prerequisites, evidence needs, and failure modes, then let the student choose.

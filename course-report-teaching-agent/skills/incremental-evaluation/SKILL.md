@@ -24,6 +24,7 @@ The six dimensions = **创新性、数据分析深度、完整性、文献引用
 - Do not derive a pass/fail interval from RMSE alone. Do not add a remembered target such as a typical RMSE, a fixed number of references, or a named external dataset unless it appears in the current evidence.
 - When no acceptance criterion is available, say exactly what is observed, state that quality against the course/project target cannot yet be determined, and ask for the missing baseline.
 - Every high-priority issue must stay closed-loop: `material evidence → student action → student self-check → teacher verification`.
+- Before rendering an evaluation PDF, run `scripts/validate_evaluation_evidence.py` against the JSON, the uploaded report Markdown, and `rubric.md`. It catches ungrounded numeric thresholds, remembered dataset names, and unsupported industry-language. A failed validation means the JSON must be rewritten from current evidence; do not bypass it.
 
 ## Workflow
 

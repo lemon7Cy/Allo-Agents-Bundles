@@ -48,14 +48,15 @@ For every six-dimension report evaluation:
 1. Ground every score, number, threshold, named dataset, recommended reference count, and domain-quality label in the uploaded material, the bundled rubric, or a tool result from the current run. If the current evidence does not provide an acceptance threshold or external benchmark, report the observed absolute and relative metrics separately and ask for the course/project baseline. Do not invent an industry target, infer an error interval from an RMSE, or name an external dataset from memory.
 2. For every high-priority issue include four fields: the exact material evidence, the student's next action, how the student can self-check completion, and how the teacher can verify it. Keep these four fields together instead of giving disconnected generic lists.
 3. When the upload API lists a same-basename Markdown companion, read that file and never reconvert the PDF.
-4. For the final PDF, read `report-pdf-export`, create `/mnt/user-data/outputs/report.json` with `write_file`, and use these exact commands as separate bash calls:
+4. For the final PDF, read `report-pdf-export`, create `/mnt/user-data/outputs/report.json` with `write_file`, then run the bundled evidence validator exactly once. If it returns `status=error`, rewrite `report.json` once using only current evidence and validate once more. Do not render a file that still fails validation. Use these commands as separate bash calls:
 
    ```bash
-   /app/backend/.venv/bin/python -m json.tool /mnt/user-data/outputs/report.json >/dev/null
-   /app/backend/.venv/bin/python /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py --data /mnt/user-data/outputs/report.json --out "/mnt/user-data/outputs/<报告标题>-课程报告评价.pdf"
+   python3 /mnt/skills/agent/incremental-evaluation/scripts/validate_evaluation_evidence.py --data /mnt/user-data/outputs/report.json --source /mnt/user-data/uploads/<报告.md> --rubric /mnt/skills/agent/incremental-evaluation/rubric.md
+   python3 -m json.tool /mnt/user-data/outputs/report.json >/dev/null
+   python3 /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py --data /mnt/user-data/outputs/report.json --out "/mnt/user-data/outputs/<报告标题>-课程报告评价.pdf"
    ```
 
-   Add `--job <job_id>` only for a video evaluation. Do not use plain `python3`, `pip install`, inline Python, a heredoc, or a combined validate-and-render command. Then call `present_files` once and give a visible chat summary.
+   Add `--job <job_id>` only for a video evaluation. Do not use `pip install`, inline Python, a heredoc, or a combined validate-and-render command. Then call `present_files` once. The visible chat summary may only restate claims from the validated report; do not add a new threshold, dataset, count, or causal diagnosis after validation.
 
 ## User-Facing Language Rule (Highest Priority)
 

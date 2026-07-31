@@ -34,6 +34,12 @@ BLOCKED_VISIBLE_TERMS = (
     "MVP",
     "同一把尺子",
     "我的进度",
+    "表达/肢体/流畅性",
+    "骨架量化",
+    "骨架锁定主讲人",
+    "归一化腕位移",
+    "pose_delivery",
+    "yolov8-pose",
 )
 PRESCRIPTIVE_QUANTITY_RE = re.compile(
     r"(?:至少|不少于)\s*(?:一|二|三|四|五|六|七|八|九|十|\d+)?\s*(?:篇|处|条|个|张|项|组|次|分钟)"

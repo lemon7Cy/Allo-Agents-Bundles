@@ -16,7 +16,7 @@ Before accepting a video job or inspecting any material, detect requests to infe
 This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds into the overall evaluation — stated positively and factually:
 - **口头可考察内容**: organize timestamped evidence around 创新性 / 数据分析深度 / 结论合理性 when those labels fit the task. 文献引用 / 格式规范性 are written-only — the video does not judge them or create written-report scores.
 - **报告↔讲解覆盖对照** (objective, reference only): for each key report point, did the oral explanation **cover it / touch it briefly / not mention it** — reported as plain facts for the teacher. Frame gaps constructively (e.g. "建议在答辩中补充说明 X") and keep every visible sentence focused on material evidence and next actions.
-- **诚实**: 表达/肢体/流畅性维度由骨架/姿态通道量化,**由 render `--job` 权威注入,agent 不写这行**;口头维度不瞎打分,每条结论带时间戳。
+- **诚实**: 只评价讲解内容、论证与报告覆盖。表达/肢体/流畅性及姿态量化属于内部处理信息，不写入聊天、报告或 PDF；口头维度不瞎打分，每条结论带时间戳。
 
 > Tone rule: this is a **constructive, objective** review. Do **not** produce anti-cheating / ghostwriting / authenticity language. If the oral explanation is thinner than the report, describe it factually and suggest what to clarify — do not speculate about who wrote the report.
 
@@ -98,7 +98,7 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
   - `findings[]`: per report point → `oral_status` (covered / thin / absent) + evidence + note. Report these as plain facts.
   - **Ignore any `authenticity_flag` / `authenticity_note` fields** the service may still return — do **not** surface them, do **not** translate them into 代写/作弊/真实性 language. They are deprecated; this review is objective and constructive only.
 - `written_only_dimensions[]` — 文献引用 / 格式规范性: explicitly "视频不评,以书面六维为准". Keep this honest boundary in the report.
-- `delivery_dimensions` / `pose_delivery` — the **表达/肢体/流畅性** dimension is owned by a skeleton/pose channel. **You do NOT write this line.** When you export the PDF, pass `--job <job_id>` to `render_report_pdf.py` and the renderer injects the authoritative 表达/肢体/流畅性 (level + 骨架证据) itself. Do NOT write "证据不足/未评分/未检测到肢体" for delivery — that is stale and the renderer will strip it.
+- `delivery_dimensions` / `pose_delivery` — internal-only fields. Ignore them completely and never surface expression/body-language/fluency judgments, levels, channel names, frame counts, or motion metrics in chat, artifacts, or PDF. `--job` is used only to guarantee the key-frame evidence gallery.
 - `highlights[]` / `problems[]` — timestamped 讲解闪光点/薄弱处 (frame problems as improvement suggestions).
 - `warnings[]` — surface only a user-relevant limitation that materially affects the content judgment. Do not expose channel names, counts, implementation details, or use them to judge fluency.
 

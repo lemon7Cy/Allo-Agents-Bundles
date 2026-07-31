@@ -713,80 +713,8 @@ def _gallery_from_eval(ev: dict, out_dir: str):
     return {"heading": "关键帧证据", "blocks": [{"type": "gallery", "cols": 2, "images": images}]}
 
 
-def _ensure_pose_delivery(data: dict, ev: dict) -> None:
-    """Render-level GUARANTEE for the 表达/肢体/流畅性 dimension: when the eval has a
-    pose_delivery (skeleton channel), drop any wrong "证据有限未评分 / 未检测到肢体" delivery
-    line the agent wrote (weaker models ignore the pose data and fall back to N/A), and
-    inject the authoritative pose-backed assessment. Model-independent."""
-    import re
-
-    pose = ev.get("pose_delivery") or {}
-    level = pose.get("delivery_level")
-    if not level:
-        return
-    authoritative = f"**表达/肢体/流畅性:{level}** —— {str(pose.get('evidence') or '').strip()}"
-    sections = data.get("sections") or []
-    subj = re.compile(r"(表达|肢体|姿态|姿体|流畅|delivery)", re.I)
-    lvl = re.compile(r"[强中弱]")
-    # a REAL pose assessment carries actual skeleton numbers — not just the word "骨架"
-    metric = re.compile(r"(静止|手势活动|移动量|归一化|锁定主讲)")
-    # a placeholder/deferral/N-A line about delivery (must be replaced, must NOT count as done)
-    placeholder = re.compile(r"(未评分|证据有限|证据不足|N\s*/?\s*A|未检测|无法评估|不作评分|不予评分|不单独|不撰写|权威注入|--job|由骨架[^,。]{0,8}(注入|量化))", re.I)
-
-    def _is_real(t: str) -> bool:
-        return bool(subj.search(t) and lvl.search(t) and metric.search(t))
-
-    def _is_placeholder(t: str) -> bool:
-        return bool(subj.search(t) and placeholder.search(t) and not metric.search(t))
-
-    already = False
-    for s in sections:
-        new_blocks = []
-        for b in s.get("blocks") or []:
-            bt = b.get("type")
-            if bt == "bullets":
-                kept = []
-                for it in b.get("items") or []:
-                    t = str(it)
-                    if _is_real(t):
-                        already = True
-                        kept.append(it)
-                    elif _is_placeholder(t):
-                        continue  # drop the deferral / N-A delivery bullet
-                    else:
-                        kept.append(it)
-                b["items"] = kept
-                new_blocks.append(b)
-            elif bt in ("paragraph", "note"):
-                t = str(b.get("text") or "")
-                if _is_real(t):
-                    already = True
-                    new_blocks.append(b)
-                elif _is_placeholder(t) and len(t) < 240:
-                    continue  # drop a short delivery deferral / N-A block entirely
-                else:
-                    new_blocks.append(b)
-            else:
-                new_blocks.append(b)
-        s["blocks"] = new_blocks
-    if already:
-        return  # a real pose assessment is already present
-
-    target = next((s for s in sections if any(w in str(s.get("heading", "")) for w in ("讲解", "答辩"))), None)
-    if target:
-        bl = next((b for b in target.get("blocks") or [] if b.get("type") == "bullets"), None)
-        if bl is not None:
-            bl.setdefault("items", []).append(authoritative)
-            return
-    idx = next((i for i, s in enumerate(sections) if any(b.get("type") == "radar" for b in (s.get("blocks") or []))), len(sections))
-    sections.insert(idx, {"heading": "表达/肢体/流畅性(骨架量化)", "blocks": [{"type": "note", "text": authoritative}]})
-    data["sections"] = sections
-
-
 def _augment_from_job(data: dict, job_id: str, out_dir: str) -> None:
-    """Render-level guarantees for a video evaluation (fetch the eval once): ensure the
-    关键帧证据 gallery AND the pose-backed 表达/肢体/流畅性 dimension both appear, regardless
-    of what the (possibly weaker) agent model produced."""
+    """Ensure a video evaluation contains its key-frame evidence gallery."""
     ev = _fetch_course_eval(job_id)
     if not ev:
         return
@@ -797,7 +725,6 @@ def _augment_from_job(data: dict, job_id: str, out_dir: str) -> None:
             idx = next((i for i, s in enumerate(sections) if any(b.get("type") == "radar" for b in (s.get("blocks") or []))), len(sections))
             sections.insert(idx, gallery)
             data["sections"] = sections
-    _ensure_pose_delivery(data, ev)
 
 
 def main() -> int:
@@ -844,8 +771,7 @@ def main() -> int:
     out_path = os.path.abspath(os.path.expanduser(args.out))
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
 
-    # Render-level guarantees for a video evaluation, regardless of the agent's model:
-    # the 关键帧证据 gallery AND the pose-backed 表达/肢体/流畅性 dimension.
+    # Render-level guarantee for a video evaluation: preserve the key-frame gallery.
     if args.job:
         try:
             _augment_from_job(data, args.job, os.path.dirname(out_path))

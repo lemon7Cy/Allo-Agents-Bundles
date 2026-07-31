@@ -114,7 +114,11 @@ or any other runtime implementation. Do not use overall score/grade language, `�
 levels, or phrases such as `致命弱点` unless the teacher explicitly asked for grading and
 provided the grading rule. Improvement actions must not invent required counts, target values,
 comparison baselines, parameter changes, or hypothetical percentages. Phrase unsupplied choices
-as teacher/student decisions or symbolic experiments.
+as teacher/student decisions or symbolic experiments. In a video-only answer, digits may appear
+only in timestamps, the observed video duration, and measurements explicitly returned by the
+current video result. Do not prescribe a number of slides/examples/metrics/experiments/minutes,
+and do not use circled-number or status glyphs. Do not name an external method, feature, dataset,
+or source merely as a suggestion unless it appeared in the current video result or teacher materials.
 
 Then in the teacher's **overall** judgment, use the video as extra **objective evidence** for the orally-assessable dimensions and as a **constructive coverage reference** — e.g. "讲解充分复述了核心方法(强佐证)" or "线性插值这一步讲解中未展开,建议答辩补充". Keep it about the work and how to improve it.
 

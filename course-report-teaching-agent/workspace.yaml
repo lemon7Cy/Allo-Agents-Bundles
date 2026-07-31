@@ -3,8 +3,8 @@ agent: course-report-teaching-agent
 
 metadata:
   title: 教学助手
-  subtitle: 课程报告全流程：探索选题、撰写修订、评价反思
-  description: 面向课程报告场景的教学工作台，围绕三库材料、六维评价和初终稿增量分析，支持教师和学生完成课程报告全过程。
+  subtitle: 课程报告设计、指导与评价支持
+  description: 面向课程报告教学场景，支持选题设计、材料整理、写作指导、报告评价和初终稿对比分析。
   icon: graduation-cap
   theme:
     accent: sky
@@ -18,21 +18,19 @@ layout:
       - workflow-overview
       - material-slots
       - six-dimension-rubric
-      - progress-checklist
       - evaluation-boundary
   right:
     width: 58
     panels:
       - chat
       - prompts
-      - capability-flow
       - artifacts
 
 panels:
   - id: workflow-overview
     type: overview
-    title: 教学助手工作流
-    summary: 以课程报告为主线，支持“探索与选题 → 撰写与修订 → 评价与反思”的完整教学过程。
+    title: 课程报告教学支持
+    summary: 围绕选题设计、材料整理、写作指导和报告评价，为课程报告教学提供全过程支持。
     items:
       - 探索与选题：结合课程目标、学生兴趣、素材数据和文献线索形成个性化选题。
       - 撰写与修订：围绕“观点-证据-反思”结构组织报告提纲、段落和修改建议。
@@ -41,8 +39,8 @@ panels:
 
   - id: material-slots
     type: file_slots
-    title: 三库与草稿材料
-    description: 当前版本通过材料槽提示用户在对话中上传、粘贴或说明材料；后续可接入真实 workspace 文件绑定。
+    title: 课程材料与报告
+    description: 请在对话中上传课程要求、教学资料、评价标准、学生报告或相关数据。
     slots:
       - id: assignment-brief
         label: 课程任务书 / 作业要求
@@ -50,17 +48,17 @@ panels:
         accepts: [pdf, docx, md, txt]
         required: false
       - id: material-library
-        label: 素材库
+        label: 数据与过程材料
         description: 课程数据集、实验记录、案例材料、代码、图表和学生作业过程材料。
         accepts: [csv, xlsx, pdf, docx, md, txt, py, ipynb]
         multiple: true
       - id: corpus-library
-        label: 语料库
+        label: 教学与参考资料
         description: 教材、课程 PPT、教学大纲、学术文献、优秀报告样例和写作模板。
         accepts: [pdf, pptx, docx, md, txt]
         multiple: true
       - id: rubric-library
-        label: 指标库 / 六维评分标准
+        label: 评价标准
         description: 评价量规、评分维度、格式规范、教师自定义标准和课程要求。
         accepts: [pdf, docx, md, txt]
       - id: initial-draft
@@ -111,22 +109,9 @@ panels:
         evidence: 报告模板、评价量规、终稿。
         risk: 格式混乱、图表或引用不规范。
 
-  - id: progress-checklist
-    type: checklist
-    title: 课程报告进度
-    items:
-      - 明确课程任务书、报告目的、读者和提交要求。
-      - 整理素材库、语料库和指标库，标记仍缺少的材料。
-      - 完成选题探索，并确认创新性、可行性和课程匹配度。
-      - 形成报告提纲和“观点-证据-反思”映射。
-      - 完成初稿，并按六维模型进行自查或评审。
-      - 根据反馈完成修订，保留关键修改依据。
-      - 提交终稿，并进行初终稿增量评价。
-      - 生成教师参考评语、学生反思问题和下一步改进建议。
-
   - id: evaluation-boundary
     type: markdown_panel
-    title: 评价边界
+    title: 评价说明
     markdown: |
       - 教学助手聚焦材料整理、证据核对、修改建议和教学追问。
       - 评价结论必须基于课程材料、学生文本、数据、文献或评价量规。
@@ -143,20 +128,13 @@ panels:
   - id: prompts
     type: entry_prompts
     title: 常用任务
-    description: 常用任务来自 capabilities.yaml，覆盖选题、三库整理、提纲生成、六维评价和增量分析。
+    description: 可从选题设计、材料整理、提纲指导、报告评价和初终稿对比等任务开始。
     source:
       prompts: capabilities.entry_prompts
 
-  - id: capability-flow
-    type: capability_board
-    title: 能力流程
-    description: 展示教学助手声明的全流程能力和当前依赖状态。
-    source:
-      capabilities: self
-
   - id: artifacts
     type: artifact_list
-    title: 教学产物记录
-    description: 当前为产物占位区，后续可接入提纲、评审表、增量评价、教师评语和学生反思记录。
+    title: 评价文件
+    description: 生成的选题方案、报告提纲、评价报告和初终稿对比结果会集中显示在这里。
     filters:
       kinds: [topic_plan, outline, draft_review, rubric_evaluation, draft_comparison, reflection]

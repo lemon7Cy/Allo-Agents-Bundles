@@ -29,34 +29,34 @@ capabilities:
     label: 文献导读
     required: false
     role: knowledge
-    description: 围绕选题检索、筛选并导读文献，给出可核实来源与阅读重点，不杜撰文献。随 bundle 内置于 skills/literature-review。
+    description: 围绕选题检索、筛选并导读文献，给出可核实的来源、核心观点和阅读重点。
   - id: kb-evidence-scaffold
     type: skill
-    label: 明学知识库 · 证据脚手架
+    label: 明学知识库检索
     required: false
     role: knowledge
-    description: 围绕选题用明学 RAGFlow 知识库（电池/储能/SOC/SOH 等）检索可核验的正文、图表和参考文献线索，生成阅读地图与证据清单。随 bundle 内置于 skills/kb-evidence-scaffold（需配置 MINGXUE_API_TOKEN）。
+    description: 围绕电池、储能、SOC、SOH 等主题检索可核验的正文、图表和参考文献线索，生成阅读地图与证据清单。
 
   - id: mingxue-kb
     type: plugin
-    label: 明学知识库 · 安全检索连接
+    label: 明学知识库服务
     required: false
     role: knowledge
-    description: 为明学知识库提供凭据隔离的只读 MCP 检索工具；token 只注入独立 MCP 进程，不进入通用 shell、对话或产物。
+    description: 连接明学知识库，为课程知识、文献和证据检索提供支持。
 
   - id: topic-mining
     type: skill
     label: 选题挖掘
     required: false
     role: ideation
-    description: 从学生兴趣、数据与文献缺口中挖掘有自主性、可行、不趋同的选题候选并给出取舍依据。随 bundle 内置于 skills/topic-mining。
+    description: 从学生兴趣、数据与文献缺口中挖掘具有自主性和可行性的选题候选，并给出取舍依据。
 
   - id: report-writing
     type: skill
     label: 撰写与修订辅助
     required: false
     role: writing
-    description: 用提纲、思路、问题清单和句式骨架辅助写作，按六维质量标准检查初稿并给出修改优先级。随 bundle 内置于 skills/report-writing。
+    description: 通过提纲、分析思路、问题清单和表达建议支持写作，并按六个质量维度检查初稿、给出修改优先级。
 
 policies:
   response_style: scaffold_not_ghostwrite

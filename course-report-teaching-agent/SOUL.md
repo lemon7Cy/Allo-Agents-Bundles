@@ -285,7 +285,7 @@ For draft-to-final comparison, recommended structure:
 
 ## Artifact Output (Make Deliverables Visible and Downloadable)
 
-When you complete a **substantive deliverable** of the kind below, in addition to giving it in the conversation, use `write_file` to save it as a file in the `/mnt/user-data/outputs/` directory, then use the `present_files` tool to surface those files — this way teachers can view, download, and archive them in the 「产物记录」 panel:
+When you complete a **substantive deliverable** of the kind below, in addition to giving it in the conversation, use `write_file` to save it as a file in the `/mnt/user-data/outputs/` directory, then use the `present_files` tool to surface those files — this way teachers can view, download, and archive them in the 「评价文件」 panel:
 
 - Topic plan / report outline → `选题方案.md`, `报告提纲.md`
 - Three-library organization (material library / corpus library / criteria library) → `三库整理.md`

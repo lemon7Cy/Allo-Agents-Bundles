@@ -13,37 +13,37 @@ capabilities:
     label: 探索与选题
     required: true
     role: planning
-    description: 基于课程目标、学生兴趣、素材库、语料库和可用数据推荐课程报告选题，并评估创新性、可行性和风险（随包 skill：skills/topic-exploration）。
+    description: 基于课程目标、学生兴趣、教学资料和可用数据推荐课程报告选题，并评估创新性、可行性和风险。
   - id: material-grounding
     type: rag
-    label: 三库材料 Grounding
+    label: 课程材料整理
     required: false
     role: grounding
-    description: 区分素材库、语料库和指标库，将课程材料、数据、文献、范例和评价量规转化为观点-证据-反思映射。
+    description: 分类整理课程材料、数据、文献、范例和评价标准，形成清晰的观点与证据对应关系。
   - id: literature-and-knowledge-guide
     type: skill
     label: 文献导读与课程知识支持
     required: false
     role: knowledge
-    description: 提炼文献和课程材料中的关键观点，解释课程概念，提示引用质量和理论支撑风险（随包 skill：skills/literature-and-knowledge-guide）。
+    description: 提炼文献和课程材料中的关键观点，解释课程概念，并提示引用质量和理论支撑风险。
   - id: kb-citation-verifier
     type: skill
-    label: 明学知识库 · 引用核查
+    label: 明学知识库引用核查
     required: false
     role: knowledge
-    description: 用明学 RAGFlow 知识库（电池/储能/SOC/SOH 等）做选题文献支撑，并在评审“文献引用/数据分析”维度时核查学生引用是否真实、是否支撑结论（随包 skill：skills/kb-citation-verifier，需配置 MINGXUE_API_TOKEN）。
+    description: 围绕电池、储能、SOC、SOH 等主题提供文献支持，并核查学生引用是否真实、是否能够支撑相关结论。
   - id: mingxue-kb
     type: plugin
-    label: 明学知识库 · 安全检索连接
+    label: 明学知识库服务
     required: false
     role: knowledge
-    description: 为明学知识库提供凭据隔离的只读 MCP 检索工具；token 只注入独立 MCP 进程，不进入通用 shell、对话或评价产物。
+    description: 连接明学知识库，为课程知识、文献和证据核查提供支持。
   - id: draft-and-revision-coach
     type: skill
     label: 撰写与修订辅导
     required: false
     role: writing
-    description: 生成课程报告提纲、分节写作建议、修改优先级和带空白位的局部结构示范，帮助用户根据现有材料完成修订（随包 skill：skills/draft-and-revision-coach）。
+    description: 生成课程报告提纲、分节写作建议、修改优先级和局部结构示例，帮助用户结合现有材料完成修订。
   - id: six-dimension-evaluation
     type: review
     label: 六维评分与量规评价
@@ -55,19 +55,19 @@ capabilities:
     label: 初终稿增量评价
     required: false
     role: assessment
-    description: 对比初稿和终稿，识别结构、证据、数据分析、引用、结论和反思的具体改进与剩余风险（随包 skill：skills/incremental-evaluation，雷达图）。
+    description: 对比初稿和终稿，识别结构、证据、数据分析、引用、结论和反思等方面的具体改进与剩余问题。
   - id: report-presentation-review
     type: skill
     label: 讲解答辩视频评价
     required: false
     role: assessment
-    description: 处理学生的课程报告讲解/答辩录像，用时间戳证据辅助评价创新性、数据分析深度和结论合理性，并客观对照书面报告要点的讲解覆盖情况（随包 skill：skills/report-presentation-review，调用 Allo 视频理解服务）。
+    description: 分析学生的课程报告讲解或答辩录像，结合时间点证据评价讲解质量，并核对书面报告要点的覆盖情况。
   - id: report-pdf-export
     type: skill
     label: 评价报告导出 PDF
     required: false
     role: delivery
-    description: 把已产出的评价（六维评分/增量评价/讲解一致性核验）渲染成规整可打印的 A4 PDF，一名学生一份；中文字体自动处理（优先嵌入系统 CJK 字体）。仅做排版渲染，不重新打分（随包 skill：skills/report-pdf-export）。
+    description: 将六维评价、初终稿对比或讲解评价整理为清晰、规范、可打印的 PDF 报告。
   - id: reflection-coach
     type: workflow_step
     label: 教学反思与成长建议

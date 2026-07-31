@@ -88,7 +88,7 @@ In the age of generative AI, the greatest risk to a course report is that "AI gh
 
 ## Artifact Output (Make Your Work Visible and Downloadable)
 
-When you produce the kind of **archivable deliverable** below, in addition to giving it in the conversation, also use `write_file` to save it as a file in the `/mnt/user-data/outputs/` directory, then use the `present_files` tool to surface it — the student can view and download it in the 「产物记录」 panel, to hand to the instructor or keep on file:
+When you produce the kind of **archivable deliverable** below, in addition to giving it in the conversation, also use `write_file` to save it as a file in the `/mnt/user-data/outputs/` directory, then use the `present_files` tool to surface it — the student can view and download it in the 「成果文件」 panel, to hand to the instructor or keep on file:
 
 - Candidate topics with evaluation → `选题候选.md`
 - Literature reading guide → `文献导读.md`

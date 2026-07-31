@@ -51,6 +51,7 @@ ALLOWED_TEXT_NUMBERS = {"0", "1", "2", "3", "4", "5", "6", "100"}
 CANONICAL_DIMENSIONS = ("创新性", "数据分析深度", "完整性", "文献引用", "结论合理性", "格式规范性")
 QUANTITATIVE_MODES = {"quantitative_six_dimension", "incremental_quantitative"}
 QUALITATIVE_MODES = {"qualitative", "incremental_qualitative", "video_only", "report_video_qualitative"}
+RENDERABLE_BLOCK_TYPES = {"paragraph", "text", "bullets", "table", "scorecard", "note", "radar", "gallery", "image"}
 
 
 def _normalise_number(token: str) -> str:
@@ -213,6 +214,21 @@ def _quantitative_structure_issues(data: Any) -> list[dict[str, str]]:
     return issues
 
 
+def _renderable_block_issues(data: Any) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    for section_index, block_index, block in _section_blocks(data):
+        block_type = block.get("type", "paragraph")
+        path = f"sections.{section_index}.blocks.{block_index}"
+        if block_type not in RENDERABLE_BLOCK_TYPES:
+            issues.append({"path": f"{path}.type", "kind": "unrenderable_block_type", "value": str(block_type)})
+            continue
+        if block_type in {"paragraph", "text", "note"}:
+            visible_text = block.get("text") or block.get("content")
+            if not isinstance(visible_text, str) or not visible_text.strip():
+                issues.append({"path": path, "kind": "empty_text_block", "value": str(block_type)})
+    return issues
+
+
 def _unsupported_named_or_quality_issues(data: Any, evidence: str) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
     for path, text in _walk_strings(data):
@@ -270,6 +286,7 @@ def main() -> int:
     issues: list[dict[str, str]] = []
     if not args.allow_benchmark:
         issues.extend(_benchmark_issues(data))
+    issues.extend(_renderable_block_issues(data))
     issues.extend(_quantitative_structure_issues(data))
     issues.extend(_unsupported_named_or_quality_issues(data, evidence))
     issues.extend(_visible_language_issues(data, evidence))

@@ -507,8 +507,8 @@ def _render_block(block: dict, st: dict, avail_width: float) -> list:
             out.append(Paragraph(_markup(block["caption"]), st["caption"]))
         out.append(Spacer(1, 6))
         return out
-    if btype == "paragraph":
-        return [Paragraph(_markup(block.get("text", "")), st["body"])]
+    if btype in ("paragraph", "text"):
+        return [Paragraph(_markup(block.get("text") or block.get("content", "")), st["body"])]
     if btype == "bullets":
         return [Paragraph(_markup(item), st["bullet"], bulletText="•") for item in block.get("items", [])]
     if btype == "table":
@@ -532,8 +532,10 @@ def _render_block(block: dict, st: dict, avail_width: float) -> list:
             out.append(Paragraph(_markup(block["caption"]), st["caption"]))
         out.append(Spacer(1, 6))
         return out
-    # Unknown block: degrade to a paragraph of whatever text it carries.
-    return [Paragraph(_markup(block.get("text", "")), st["body"])]
+    # Unknown block: degrade to a paragraph of whatever text it carries. The
+    # evidence validator rejects unknown types in normal production flows, but
+    # this fallback preserves readable content for legacy JSON.
+    return [Paragraph(_markup(block.get("text") or block.get("content", "")), st["body"])]
 
 
 def _build_story(data: dict, st: dict, avail_width: float) -> list:

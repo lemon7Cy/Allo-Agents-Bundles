@@ -71,6 +71,7 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
    ```
    (Omit the file to skip the coverage comparison and only get the video-side evaluation.)
    - **Video-only branch:** if no written report was supplied, do not read `gallery_block.json`, do not read the incremental-evaluation skill, and do not create/present a file or render a PDF unless the teacher explicitly requested a downloadable artifact. Reply in chat with the full substantive review: organization, central message, supporting material, timestamped content evidence, and concrete improvement actions. Explicitly state briefly that written-report dimensions are not evaluated. Unless the teacher explicitly requested grading, remove every `level` field and do not turn `强/中/弱` into an overall grade. Omit expression/body-language/fluency entirely; do not explain which internal channel owns it.
+   - **Report + video qualitative branch:** when a written report is supplied but the teacher did not explicitly request scoring, quantification, a radar, or a downloadable artifact, keep the joint review qualitative and chat-first. Do not read the numeric incremental-evaluation rubric, create `scores.json`, write/present a file, or render a PDF. The report supplies written evidence; the video supplies timestamped oral/coverage evidence only. Before replying, remove every visible `job_id`, path, service/model/channel name, internal field, tool command, renderer instruction, status glyph, and prescriptive quantity not supplied by the teacher/materials. An observed number may be quoted as evidence, but never turn it into a required count/threshold. Do not compare an observed metric with a remembered `典型/行业/通常` range, and do not introduce an external dataset, method, paper, or standard merely as a suggestion unless it appears in current materials or a current-run source.
 5. **ALWAYS write the evaluation as a visible chat reply — this is the deliverable.**
    - Fold the `course-eval` result into the 讲解答辩评价段 (see Output) and **output the full text directly in the conversation.** The teacher must see it in chat.
    - Saving a `讲解答辩评价.md` file via `write_file` + `present_files` is **optional and secondary**. **Never end your turn with only a file and no chat text** — that shows up as "执行完成但没有输出" and is a failure. If you save a file, still give the summary in chat.
@@ -119,6 +120,9 @@ only in timestamps, the observed video duration, and measurements explicitly ret
 current video result. Do not prescribe a number of slides/examples/metrics/experiments/minutes,
 and do not use circled-number or status glyphs. Do not name an external method, feature, dataset,
 or source merely as a suggestion unless it appeared in the current video result or teacher materials.
+Apply the same recommendation and internal-identifier hygiene to a qualitative report + video
+answer. Report-observed numbers remain evidence, but `至少/不少于/各...篇/各...张/补...项`,
+invented acceptance thresholds, and remembered `典型/行业/通常` benchmarks are forbidden.
 
 Then in the teacher's **overall** judgment, use the video as extra **objective evidence** for the orally-assessable dimensions and as a **constructive coverage reference** — e.g. "讲解充分复述了核心方法(强佐证)" or "线性插值这一步讲解中未展开,建议答辩补充". Keep it about the work and how to improve it.
 

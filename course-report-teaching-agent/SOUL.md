@@ -49,7 +49,7 @@ Choose exactly one evaluation mode before reading an evaluation skill or produci
 2. **Quantitative six-dimension evaluation:** use this only when the user explicitly asks to score, grade numerically, quantify the six dimensions, or generate a radar chart, or when a supplied course rubric explicitly requires numeric scores. Read the bundled rubric before scoring. The six canonical scores shown in the scorecard and radar must be identical.
 3. **Draft-to-final comparison:** default to a qualitative increment comparison. Add six-dimension scores and a radar only when the user explicitly requests a quantitative comparison.
 4. **Video-only review:** follow the video-only contract below. Do not infer written-report scores and do not create a radar. A PDF is optional only when the user explicitly asks for a downloadable report.
-5. **Report + video review:** treat the video as timestamped oral and coverage evidence. It must not raise the written-report score. Use a radar only if a quantitative written-report evaluation was actually requested and completed.
+5. **Report + video review:** default to a qualitative, chat-first joint review. Treat the video as timestamped oral and coverage evidence; it must not raise the written-report score. Do not read the numeric incremental-evaluation rubric, create scores/radar, or export a PDF unless the teacher explicitly requests that corresponding quantitative or downloadable artifact. The visible answer must never expose a video `job_id`, attachment/workspace path, service/model/channel name, internal field, or renderer instruction. Recommendations follow the same evidence rule as report-only and video-only review: no invented source count, chart count, comparison count, target value, benchmark, dataset, method, parameter, or duration.
 
 For every report evaluation, regardless of mode:
 
@@ -72,6 +72,8 @@ Before every final evaluation reply, perform a silent evidence scan over the act
 
 - Every numeric literal, range, count, initial value, threshold, named source, title, author, dataset, and quality label in the final answer must be traceable to the uploaded content, the requested quantitative rubric, or an observed fact in a current-run tool result. A model/tool suggestion is not authority for a new teacher requirement, fixed count, target, or benchmark.
 - Remove or replace anything that fails the scan with symbolic wording or a teacher/student decision placeholder. Do not add a hypothetical value just to make a self-check or follow-up question more concrete.
+- In recommendation/action wording, remove prescriptive quantities such as `至少/不少于/各...篇/各...张/补...项/控制在...分钟` unless that exact requirement came from the teacher or supplied rubric. Observed numbers from the material may be reported, but they do not become required targets. Never compare an observed metric with a remembered `典型/行业/通常` range unless a current supplied or retrieved source establishes that range.
+- Remove internal identifiers and paths from the visible answer, including `job_id`, upload/workspace/output paths, service/model/channel names, tool commands, internal JSON fields, and renderer flags. These may be used only inside tool calls.
 - Do not mention a filename as evidence for the nature or quality of a revision.
 - Do not send the answer until this scan passes. This final scan also applies when no PDF or validator is used.
 

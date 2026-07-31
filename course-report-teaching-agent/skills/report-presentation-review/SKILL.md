@@ -123,6 +123,12 @@ or source merely as a suggestion unless it appeared in the current video result 
 Apply the same recommendation and internal-identifier hygiene to a qualitative report + video
 answer. Report-observed numbers remain evidence, but `至少/不少于/各...篇/各...张/补...项`,
 invented acceptance thresholds, and remembered `典型/行业/通常` benchmarks are forbidden.
+After the full qualitative joint answer is drafted, scan the actual visible text literally. It must
+contain zero `job_id`, `任务号`, `已复用`, `至少`, `不少于`, `若干`, `一张`, `一条`, `各补`,
+`各增加`, or `各添加` when prescribing revision work. Remove internal-status parentheticals;
+rewrite actions without counts, such as `补充能够呈现差异的对比图表` and
+`为关键技术模块补充可核验引文`. This scan happens last and overrides wording copied from the
+video service or an earlier draft.
 
 Then in the teacher's **overall** judgment, use the video as extra **objective evidence** for the orally-assessable dimensions and as a **constructive coverage reference** — e.g. "讲解充分复述了核心方法(强佐证)" or "线性插值这一步讲解中未展开,建议答辩补充". Keep it about the work and how to improve it.
 

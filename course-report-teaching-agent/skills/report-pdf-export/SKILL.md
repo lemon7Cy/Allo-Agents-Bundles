@@ -24,14 +24,28 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
 
 1. Assemble a `report.json` from the evaluation you already produced (schema below).
    Put real, already-established content only — never fabricate scores or findings.
-2. Run the renderer, writing to `/mnt/user-data/outputs/` so the file is delivered:
+2. Validate `report.json` in a separate command. Do not combine validation and rendering, do not
+   use a heredoc or inline Python to create/repair the document, and do not install packages:
 
    ```bash
-   python3 /mnt/skills/.../report-pdf-export/scripts/render_report_pdf.py \
-     --data report.json \
+   /app/backend/.venv/bin/python -m json.tool /mnt/user-data/outputs/report.json >/dev/null
+   ```
+
+   Build or repair `report.json` only with `write_file`. Inside JSON string values, prefer Chinese
+   corner quotes `「」` instead of unescaped ASCII double quotes.
+3. Run the renderer with the same bundled interpreter, writing to `/mnt/user-data/outputs/` so the
+   file is delivered:
+
+   ```bash
+   /app/backend/.venv/bin/python /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py \
+     --data /mnt/user-data/outputs/report.json \
      --out "/mnt/user-data/outputs/锂电池SOC-SOH联合估计报告-课程报告评价.pdf" \
      --job c672ae77-...   # ONLY for a defense-video evaluation — see below
    ```
+
+   If the bundled interpreter reports that `reportlab` is unavailable, stop and report a server
+   dependency problem. Never run `pip install`, never switch to the plain `python3`, and never
+   retry by embedding the whole report in a shell command.
 
    **When the evaluation includes a 讲解答辩视频, ALWAYS pass `--job <job_id>`.** With it,
    the renderer fetches the video's key frames itself and guarantees the 「关键帧证据」
@@ -45,10 +59,10 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
    - Name the file `报告标题-课程报告评价.pdf`, where 报告标题 is the **uploaded report's
      title** (its filename minus the extension). **Never** use student names in the
      filename. One PDF per report; do not render the same report to two names.
-3. `present_files` the resulting PDF and tell the teacher in chat what was produced.
+4. `present_files` the resulting PDF and tell the teacher in chat what was produced.
 
-Keep this to ~2 tool calls (write JSON → render). Do not re-fetch the evaluation or
-re-run scoring — this skill only renders.
+Keep this to four deterministic tool calls (write JSON → validate JSON → render → present). Do not
+re-fetch the evaluation or re-run scoring — this skill only renders.
 
 ### Markdown fallback
 
@@ -57,7 +71,7 @@ renderer parses a practical subset (`#`/`##`/`###` headings, `-`/`*` bullets, pi
 tables, `**bold**`, paragraphs):
 
 ```bash
-python3 .../render_report_pdf.py --markdown eval.md --out "/mnt/user-data/outputs/不同温度下锂离子电池SOC估计-课程报告评价.pdf"
+/app/backend/.venv/bin/python /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py --markdown eval.md --out "/mnt/user-data/outputs/不同温度下锂离子电池SOC估计-课程报告评价.pdf"
 ```
 
 Prefer `--data` (JSON) when you can — it gives the tidiest, most deterministic layout.

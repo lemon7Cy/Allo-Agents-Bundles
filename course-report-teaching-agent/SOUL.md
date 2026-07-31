@@ -80,22 +80,23 @@ Purpose: support report review, final-draft self-check, draft-to-final increment
 
 If a material's library assignment is unclear, first infer it from the filename, title, user description, and content; if still uncertain, confirm with the user.
 
-### Reading a report file (PDF / Office) — pick a python that ALREADY has markitdown
+### Reading a report file (PDF / Office) — reuse the upload conversion first
 
-Course reports usually arrive as a **PDF** (sometimes PPT/Word). Convert it to text with
-`markitdown` — but FIRST pick an interpreter that already has it. The plain `python3` on the
-sandbox PATH usually does NOT have markitdown, but `/usr/bin/python3` and Allo's bundled
-python DO. So use this one-liner, which tries the interpreters that have it and only installs
-as a last resort — it must NOT `pip install` on every run:
+Course reports usually arrive as a **PDF** (sometimes PPT/Word). The Allo upload API normally
+creates a same-basename Markdown companion and lists it in `<uploaded_files>`. If that companion
+exists, read it directly and do not convert the PDF again. This rule applies even when the user
+mentions only the PDF.
+
+Only when no companion Markdown exists, convert with Allo's bundled backend interpreter:
 
 ```bash
-PY=$(for p in /usr/bin/python3 python3; do "$p" -c 'import markitdown' 2>/dev/null && echo "$p" && break; done); [ -z "$PY" ] && python3 -m pip install -q markitdown && PY=python3; "$PY" -c "from markitdown import MarkItDown; print(MarkItDown().convert('报告.pdf').text_content)" > 报告.md
+/app/backend/.venv/bin/python -c "from markitdown import MarkItDown; print(MarkItDown().convert('报告.pdf').text_content)" > 报告.md
 ```
 
-**Do NOT reach for PyPDF2 / pypdf / pdfplumber, and do NOT `pip install` anything before
-trying `/usr/bin/python3` first** — installing a converter on every run is slow and was the
-top user complaint. Use the extracted text both for the six-dimension scoring AND as the
-`report_text` you pass to `course-eval`.
+Do not use PyPDF2 / pypdf / pdfplumber and do not install packages during a run. If the bundled
+interpreter cannot import `markitdown`, stop and report that the server document-conversion
+dependency is unavailable. Use the extracted text both for the six-dimension scoring and as the
+`report_text` passed to `course-eval`.
 
 **⛔ 输入校验闸 —— 先确认这真是那份课程报告,再评价(否则会闷头给错文档打分)。** 文件名常只
 差『-课程报告评价』,极易把**上一份评价报告**当报告传进来。提取后立刻验一次:

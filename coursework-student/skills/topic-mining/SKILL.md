@@ -80,17 +80,3 @@ python3 /mnt/skills/agent/topic-mining/scripts/render_topic_candidates.py \
 ```
 
 The renderer removes unsupported citations, prevalence claims, rankings, promises, and absolute sufficiency claims. Do not rewrite the ledger merely to restore normalized content. On `status=ok`, call `present_files` and return `safe_chat_summary` verbatim as the whole final answer. On a structural error, fix every listed issue in one edit and rerun at most once.
-
-## 5. Output template
-```
-你的兴趣/已有素材:<复述确认>
-
-选题候选:
-1. 题目:<…>
-   - 角度/为何不趋同:…
-   - 需要的数据/方法 + 可行性:…
-   - 可体现维度:创新性/数据深度/…
-2. … （3-5 个，难度标注）
-
-帮你选:你最想深入哪个?哪个你手头已有数据/基础?（选题由你定）
-```

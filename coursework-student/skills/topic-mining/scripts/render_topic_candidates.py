@@ -23,13 +23,19 @@ STATUS_LABELS = {
 }
 DIFFICULTY_LABELS = {"low": "低", "medium": "中", "high": "高"}
 UNSUPPORTED_CLAIM = re.compile(
-    r"多数(?:课程)?报告|普遍|近期文献|文献中|研究较少|研究空白|最稳|最佳|最好|最高|高分|角度最新|投入产出比最高|充足|足够|必然|肯定|首选",
+    r"多数(?:课程)?报告|普遍|近期文献|文献中|研究较少|研究空白|最稳|最佳|最好|最高|高分|角度最新|投入产出比最高|充足|足够|适中|必然|肯定|首选",
     re.IGNORECASE,
 )
 DOI_OR_CITATION = re.compile(
     r"\b10\.\d{4,9}/\S+|\bet\s+al\.|\b[A-Z][A-Za-z'’-]+\s*[,(]?\s*(?:19|20)\d{2}\b",
     re.IGNORECASE,
 )
+INSPECTION_SIGNAL = re.compile(
+    r"真值|ground\s*truth|完整|连续|范围|覆盖|质量|分布|温度变化|计算资源|训练|测试|OCV|等效电路|模型参数|噪声协方差|充放电周期|倍率|工况|采样|缺失|异常",
+    re.IGNORECASE,
+)
+DIRECT_OCV_STEP = re.compile(r"从(?:CSV|数据).*拟合.*OCV[-–— ]?SOC|拟合.*OCV[-–— ]?SOC.*(?:CSV|数据)", re.IGNORECASE)
+UNVERIFIED_TRUTH_STEP = re.compile(r"(?:以|将)\s*`?soc_reference`?\s*(?:作为|为)\s*真值", re.IGNORECASE)
 
 
 class ValidationError(ValueError):
@@ -140,25 +146,45 @@ def validate(payload: object) -> dict:
             status = _text(item.get("status"), f"{label}.data_requirements[{data_index}].status", max_length=30)
             if status not in ALLOWED_STATUS:
                 raise ValidationError(f"{label}.data_requirements[{data_index}].status is unsupported")
-            data_requirements.append(
-                {
-                    "item": _safe_text(
-                        item.get("item"),
-                        f"{label}.data_requirements[{data_index}].item",
-                        normalizations,
-                        fallback="该数据条件待确认",
-                        max_length=240,
-                    ),
-                    "status": status,
-                    "basis": _safe_text(
-                        item.get("basis"),
-                        f"{label}.data_requirements[{data_index}].basis",
-                        normalizations,
-                        fallback="当前材料未提供可核依据。",
-                        max_length=300,
-                    ),
-                }
+            safe_item = _safe_text(
+                item.get("item"),
+                f"{label}.data_requirements[{data_index}].item",
+                normalizations,
+                fallback="该数据条件待确认",
+                max_length=240,
             )
+            safe_basis = _safe_text(
+                item.get("basis"),
+                f"{label}.data_requirements[{data_index}].basis",
+                normalizations,
+                fallback="当前材料未提供可核依据。",
+                max_length=300,
+            )
+            if not inspected and status == "stated-available" and INSPECTION_SIGNAL.search(f"{safe_item} {safe_basis}"):
+                normalizations.append(
+                    f"{label}.data_requirements[{data_index}]: downgraded an uninspected property to needs-inspection"
+                )
+                status = "needs-inspection"
+                safe_basis = "用户仅说明了字段或行数；该性质需读取原始文件后确认。"
+            data_requirements.append({"item": safe_item, "status": status, "basis": safe_basis})
+
+        method_steps = _safe_list(
+            raw.get("method_steps"),
+            f"{label}.method_steps",
+            normalizations,
+            fallback="该步骤需结合实际材料确认。",
+            maximum=6,
+        )
+        if not inspected:
+            for step_index, step in enumerate(method_steps):
+                if DIRECT_OCV_STEP.search(step):
+                    normalizations.append(f"{label}.method_steps: replaced direct OCV-SOC derivation from uninspected data")
+                    method_steps[step_index] = (
+                        "先确认数据是否包含可用于 OCV-SOC 关系识别的静置或低电流片段；否则补充外部曲线或调整该方法。"
+                    )
+                elif UNVERIFIED_TRUTH_STEP.search(step):
+                    normalizations.append(f"{label}.method_steps: replaced unverified soc_reference ground-truth claim")
+                    method_steps[step_index] = "先核对 `soc_reference` 的来源与误差，再决定它是否可作为评价基准。"
 
         candidates.append(
             {
@@ -166,13 +192,7 @@ def validate(payload: object) -> dict:
                 "course_fit": course_fit,
                 "differentiation": differentiation,
                 "data_requirements": data_requirements,
-                "method_steps": _safe_list(
-                    raw.get("method_steps"),
-                    f"{label}.method_steps",
-                    normalizations,
-                    fallback="该步骤需结合实际材料确认。",
-                    maximum=6,
-                ),
+                "method_steps": method_steps,
                 "difficulty": difficulty,
                 "difficulty_basis": _safe_list(
                     raw.get("difficulty_basis"),

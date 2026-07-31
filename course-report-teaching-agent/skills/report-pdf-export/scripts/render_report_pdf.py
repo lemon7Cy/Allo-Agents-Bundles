@@ -3,8 +3,8 @@
 
 Pure-Python (reportlab) so it runs inside the Allo desktop sandbox with no native
 deps. Chinese is handled by EMBEDDING an OS CJK font (subsetted, so the PDF stays
-small and every viewer shows identical glyphs); if none is found it falls back to
-reportlab's built-in STSong-Light CID font plus symbol sanitising.
+small and every viewer shows identical glyphs). Rendering fails closed when no
+embeddable CJK font is available or when declared evidence images cannot be loaded.
 
 Two input shapes:
   --data report.json     structured report (preferred — deterministic, tidy layout)
@@ -48,7 +48,6 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -72,9 +71,13 @@ _CJK_CANDIDATES = [
     ("/System/Library/Fonts/PingFang.ttc", 0, "/System/Library/Fonts/PingFang.ttc", 0),
     ("/System/Library/Fonts/STHeiti Medium.ttc", 0, "/System/Library/Fonts/STHeiti Medium.ttc", 0),
     ("/System/Library/Fonts/Hiragino Sans GB.ttc", 0, "/System/Library/Fonts/Hiragino Sans GB.ttc", 0),
-    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 0, "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", 0),
+    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 2, "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", 2),
+    ("/usr/share/fonts/truetype/arphic/uming.ttc", 0, "/usr/share/fonts/truetype/arphic/uming.ttc", 0),
+    ("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf", 0, "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf", 0),
     ("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 0, "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 0),
 ]
+
+_VIRTUAL_OUTPUT_PREFIX = "/mnt/user-data/outputs"
 
 # Glyphs that even good CJK fonts sometimes lack → normalise to safe equivalents so
 # a report never shows a blank box or a wrong glyph.
@@ -85,6 +88,8 @@ _SYMBOL_FIXES = {
     "✔": "√",  # ✔
     "✗": "x",       # ✗
     "✘": "x",       # ✘
+    "⚠️": "提示:",
+    "⚠": "提示:",
 }
 
 # Final user-visible language guard. Upstream evaluation should already use neutral,
@@ -113,8 +118,8 @@ _VISIBLE_LANGUAGE_FIXES = {
 def _register_fonts() -> tuple[str, str]:
     """Register a CJK font family and return (regular_name, bold_name).
 
-    Prefers embedding an OS font (correct glyphs, subsetted, small); falls back to
-    the built-in STSong-Light CID font (no file, relies on the viewer's CJK font).
+    Embed an OS font (correct glyphs, subsetted, small). Fail if none is available;
+    a non-embedded CID fallback can render as blank text in browsers and is unsafe.
     """
     for reg_path, reg_idx, bold_path, bold_idx in _CJK_CANDIDATES:
         if not os.path.exists(reg_path):
@@ -133,10 +138,7 @@ def _register_fonts() -> tuple[str, str]:
         pdfmetrics.registerFontFamily("ReportCJK", normal="ReportCJK", bold=bold_name, italic="ReportCJK", boldItalic=bold_name)
         return "ReportCJK", bold_name
 
-    # Fallback: built-in CID font (Simplified Chinese). No bold face available.
-    pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
-    pdfmetrics.registerFontFamily("STSong-Light", normal="STSong-Light", bold="STSong-Light", italic="STSong-Light", boldItalic="STSong-Light")
-    return "STSong-Light", "STSong-Light"
+    raise RuntimeError("no embeddable CJK font found; install Noto Sans CJK, AR PL UMing, WenQuanYi Micro Hei, or a supported OS Chinese font")
 
 
 def _clean(text: object) -> str:
@@ -331,6 +333,87 @@ def _decode_image(data: str):
         return io.BytesIO(base64.b64decode(raw))
     except Exception:
         return None
+
+
+def _resolve_output_image_path(data: str, out_dir: str) -> str:
+    """Resolve a sandbox-visible output path to the renderer's real output directory.
+
+    Allo translates command-line mount paths before running a shell command, but paths
+    stored *inside* report.json remain sandbox paths such as
+    /mnt/user-data/outputs/关键帧证据/example.jpg. Resolve that stable prefix here so a
+    host-side renderer can still load the file. Reject traversal outside out_dir.
+    """
+    raw = (data or "").strip()
+    if not raw or os.path.exists(raw) or not raw.startswith(f"{_VIRTUAL_OUTPUT_PREFIX}/"):
+        return raw
+    rel = raw[len(_VIRTUAL_OUTPUT_PREFIX) :].lstrip("/\\")
+    root = os.path.abspath(out_dir)
+    candidate = os.path.abspath(os.path.join(root, rel))
+    try:
+        if os.path.commonpath([root, candidate]) != root:
+            return raw
+    except ValueError:
+        return raw
+    return candidate if os.path.exists(candidate) else raw
+
+
+def _resolve_report_image_paths(data: dict, out_dir: str) -> None:
+    """Rewrite virtual image paths in report blocks to real, current-run paths."""
+    for section in data.get("sections") or []:
+        if not isinstance(section, dict):
+            continue
+        for block in section.get("blocks") or []:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "gallery":
+                items = block.get("images") or []
+            elif block.get("type") == "image":
+                items = [block]
+            else:
+                continue
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                key = "data" if item.get("data") else "thumbnail"
+                if item.get(key):
+                    item[key] = _resolve_output_image_path(str(item[key]), out_dir)
+
+
+def _declared_image_errors(data: dict) -> tuple[int, list[str]]:
+    """Preflight every declared report image so a gallery can never vanish silently."""
+    from reportlab.lib.utils import ImageReader
+
+    declared = 0
+    errors: list[str] = []
+    for section in data.get("sections") or []:
+        if not isinstance(section, dict):
+            continue
+        heading = _clean(section.get("heading") or "未命名章节")
+        for block in section.get("blocks") or []:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "gallery":
+                items = block.get("images") or []
+            elif block.get("type") == "image":
+                items = [block]
+            else:
+                continue
+            for index, item in enumerate(items, 1):
+                declared += 1
+                raw = ""
+                if isinstance(item, dict):
+                    raw = str(item.get("data") or item.get("thumbnail") or "").strip()
+                src = raw if raw and os.path.exists(raw) else _decode_image(raw)
+                if src is None:
+                    errors.append(f"{heading}#{index}: file not found or invalid image data: {raw or '<empty>'}")
+                    continue
+                try:
+                    ImageReader(src).getSize()
+                    if hasattr(src, "seek"):
+                        src.seek(0)
+                except Exception as exc:
+                    errors.append(f"{heading}#{index}: unreadable image ({type(exc).__name__}): {raw or '<inline>'}")
+    return declared, errors
 
 
 def _image_flowable(data: str, max_w: float, max_h: float):
@@ -606,7 +689,7 @@ def _gallery_from_eval(ev: dict, out_dir: str):
             raw_tc = str(kf.get("timecode") or "")
             why = str(kf.get("why") or "").strip()
             caption = f"**{name}** · {raw_tc}" + (f" · {why}" if why else "")
-            fp = kf.get("frame_path")
+            fp = _resolve_output_image_path(str(kf.get("frame_path") or ""), out_dir)
             thumb = kf.get("thumbnail") or ""
             if fp and os.path.exists(fp):
                 images.append({"data": fp, "caption": caption})
@@ -745,7 +828,11 @@ def main() -> int:
         print("error: nothing to render (no sections found in the input).", file=sys.stderr)
         return 2
 
-    regular, bold = _register_fonts()
+    try:
+        regular, bold = _register_fonts()
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     st = _styles(regular, bold)
 
     out_path = os.path.abspath(os.path.expanduser(args.out))
@@ -758,6 +845,20 @@ def main() -> int:
             _augment_from_job(data, args.job, os.path.dirname(out_path))
         except Exception:
             pass  # never let the render-level nets break rendering
+
+    # The shell sandbox maps command arguments to host paths, but virtual paths stored
+    # inside report.json are not rewritten automatically. Resolve them before layout and
+    # fail closed if any declared evidence image cannot be loaded.
+    _resolve_report_image_paths(data, os.path.dirname(out_path))
+    declared_images, image_errors = _declared_image_errors(data)
+    if args.job and declared_images == 0:
+        print("error: video report has no declared key-frame images after --job augmentation.", file=sys.stderr)
+        return 1
+    if image_errors:
+        print(f"error: {len(image_errors)}/{declared_images} declared report images could not be loaded:", file=sys.stderr)
+        for error in image_errors[:12]:
+            print(f"- {error}", file=sys.stderr)
+        return 1
 
     left = right = 20 * mm
     top = 18 * mm
@@ -792,7 +893,7 @@ def main() -> int:
         print(f"error: failed to build PDF: {exc}", file=sys.stderr)
         return 1
 
-    print(f"PDF written: {out_path} ({os.path.getsize(out_path)} bytes, font={regular})")
+    print(f"PDF written: {out_path} ({os.path.getsize(out_path)} bytes, font={regular}, images={declared_images})")
     return 0
 
 

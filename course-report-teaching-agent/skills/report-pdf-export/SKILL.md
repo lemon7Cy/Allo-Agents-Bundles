@@ -1,6 +1,6 @@
 ---
 name: report-pdf-export
-description: Export a finished course-report evaluation as a tidy, print-ready PDF — one file per report. Read this skill WHENEVER the teacher, after an evaluation has been produced (六维评分 / 增量评价 / 讲解答辩一致性核验), asks for a 完整规整的报告、导出 PDF、"pdf 吧"、可打印/可下发的评价报告 (and by default whenever an evaluation deliverable is produced). You build a small JSON from the evaluation you already produced and run the renderer; it lays out title, meta, sections, score tables and the ability radar into a clean A4 PDF. Chinese fonts are handled automatically (embeds an OS CJK font, falls back to a built-in one). Write ONLY to /mnt/user-data/outputs/ and name the file after the report/课题 title (报告标题-课程报告评价.pdf), never after student names. Do NOT invent scores or findings here — only render what the evaluation already established.
+description: Export a finished course-report evaluation as a tidy, print-ready PDF — one file per report. Read this skill WHENEVER the teacher, after an evaluation has been produced (六维评分 / 增量评价 / 讲解答辩一致性核验), asks for a 完整规整的报告、导出 PDF、"pdf 吧"、可打印/可下发的评价报告 (and by default whenever an evaluation deliverable is produced). You build a small JSON from the evaluation you already produced and run the renderer; it lays out title, meta, sections, score tables, key-frame evidence and the ability radar into a clean A4 PDF. Chinese fonts are embedded for reliable browser/download viewing, and declared images are validated instead of being silently skipped. Write ONLY to /mnt/user-data/outputs/ and name the file after the report/课题 title (报告标题-课程报告评价.pdf), never after student names. Do NOT invent scores or findings here — only render what the evaluation already established.
 ---
 
 # Course-Report PDF Export (评价报告导出 PDF)
@@ -43,15 +43,22 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
      --job c672ae77-...   # ONLY for a defense-video evaluation — see below
    ```
 
-   If the bundled interpreter reports that `reportlab` is unavailable, stop and report a server
-   dependency problem. Never run `pip install`, never switch to the plain `python3`, and never
-   retry by embedding the whole report in a shell command.
+   If the bundled interpreter reports that `reportlab` or `Pillow` is unavailable, or that no
+   embeddable CJK font exists, stop and report a server dependency problem. Never run `pip install`,
+   never switch to the plain `python3`, and never retry by embedding the whole report in a shell
+   command.
 
    **When the evaluation includes a 讲解答辩视频, ALWAYS pass `--job <job_id>`.** With it,
    the renderer fetches the video's key frames itself and guarantees the 「关键帧证据」
    gallery even if your `report.json` didn't include one — so the frames can never be lost
    to a missed step. (If your `report.json` already has the gallery, `--job` is a harmless
    no-op.) Omit `--job` for a text-only / draft-increment evaluation with no video.
+
+   Paths copied from `gallery_block.json` may remain under `/mnt/user-data/outputs/...`; keep them
+   unchanged. The renderer safely maps that virtual prefix to the current run's real output
+   directory. It exits non-zero if any declared image is missing or unreadable, and a video render
+   also fails if no key-frame image exists after `--job` augmentation. Do not present a PDF after a
+   failed render. A successful video render prints `images=<positive count>`.
 
    **Filename & location — hard rules:**
    - `--out` MUST be under `/mnt/user-data/outputs/` — never an absolute host path, the

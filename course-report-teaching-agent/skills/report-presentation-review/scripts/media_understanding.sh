@@ -5,6 +5,7 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BASE_URL="${AV_UNDERSTANDING_BASE_URL:-http://221.0.79.252:8090}"
 DEFAULT_POLL_INTERVAL="${AV_UNDERSTANDING_POLL_INTERVAL:-5}"
+COURSE_EVAL_TIMEOUT="${AV_UNDERSTANDING_COURSE_EVAL_TIMEOUT:-540}"
 # "forever" means: keep polling until the job is done/failed, as long as the
 # service health check stays alive. A number means a hard foreground timeout.
 DEFAULT_MAX_WAIT_SECONDS="${AV_UNDERSTANDING_MAX_WAIT_SECONDS:-forever}"
@@ -393,7 +394,7 @@ PY
     # `python3 - <<'PY'` heredoc — that makes the heredoc win stdin so the curl output
     # never reaches the script). It saves each key-frame thumbnail to an image FILE under
     # $ALLO_OUTPUTS_DIR and rewrites the JSON with a compact `frame_path` for the PDF gallery.
-    curl -sS --connect-timeout 10 --max-time 240 -X POST "$BASE_URL/api/jobs/$job_id/course-report-evaluation" \
+    curl -sS --connect-timeout 10 --max-time "$COURSE_EVAL_TIMEOUT" -X POST "$BASE_URL/api/jobs/$job_id/course-report-evaluation" \
       -H 'Content-Type: application/json' \
       -d "$payload" \
       | python3 "$SELF_DIR/save_key_frames.py"

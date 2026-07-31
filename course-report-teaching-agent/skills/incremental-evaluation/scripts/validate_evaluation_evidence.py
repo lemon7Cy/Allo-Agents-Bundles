@@ -18,6 +18,17 @@ EXTERNAL_ASSERTION_PATTERNS = (
 )
 REMEMBERED_DATASET_TERMS = ("NASA", "PCoE")
 QUALITY_LABELS = ("合格", "不合格", "达标", "不达标", "优秀", "良好")
+BLOCKED_VISIBLE_TERMS = (
+    "严重",
+    "最薄弱",
+    "完全套模板",
+    "直接暴露",
+    "几乎为零",
+    "断链",
+)
+PRESCRIPTIVE_QUANTITY_RE = re.compile(
+    r"(?:至少|不少于)\s*(?:一|二|三|四|五|六|七|八|九|十|\d+)?\s*(?:篇|处|条|个|张|项|组|次|分钟)"
+)
 BOOK_TITLE_RE = re.compile(r"《([^》]+)》")
 LATIN_EXAMPLE_SOURCE_RE = re.compile(r"(?:如|例如)\s*([A-Z][A-Za-z]+(?:\s*(?:&|and)\s*[A-Z][A-Za-z]+)+)")
 ALLOWED_TEXT_NUMBERS = {"0", "1", "2", "3", "4", "5", "6", "100"}
@@ -205,6 +216,21 @@ def _unsupported_named_or_quality_issues(data: Any, evidence: str) -> list[dict[
     return issues
 
 
+def _visible_language_issues(data: Any, evidence: str) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    for path, text in _walk_strings(data):
+        if path and path[0] == "meta":
+            continue
+        for term in BLOCKED_VISIBLE_TERMS:
+            if term in text:
+                issues.append({"path": ".".join(path), "kind": "unprofessional_visible_term", "value": term})
+        for match in PRESCRIPTIVE_QUANTITY_RE.finditer(text):
+            phrase = match.group()
+            if phrase not in evidence:
+                issues.append({"path": ".".join(path), "kind": "unsupported_prescriptive_quantity", "value": phrase})
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True)
@@ -230,6 +256,7 @@ def main() -> int:
         issues.extend(_benchmark_issues(data))
     issues.extend(_quantitative_structure_issues(data))
     issues.extend(_unsupported_named_or_quality_issues(data, evidence))
+    issues.extend(_visible_language_issues(data, evidence))
 
     for path, text in _walk_strings(data):
         if path and path[0] == "meta":

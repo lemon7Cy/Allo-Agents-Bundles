@@ -70,6 +70,7 @@ This skill's job is a **讲解答辩评价 + 客观覆盖对照** that folds int
    bash /mnt/skills/agent/report-presentation-review/scripts/media_understanding.sh course-eval JOB_ID /absolute/path/to/report.txt
    ```
    (Omit the file to skip the coverage comparison and only get the video-side evaluation.)
+   - If the report + video result will be validated or exported as a PDF, redirect this authoritative result to `/mnt/user-data/tmp/course-eval.json` and pass that file to the report evidence validator with `--video-evidence`. This grounds video timestamps and generated key-frame paths while leaving written-report scores grounded only in the report and rubric.
    - For the **report + video qualitative branch**, use the same single call but redirect its JSON to the private temporary evidence file, then read that file before drafting:
      ```bash
      bash /mnt/skills/agent/report-presentation-review/scripts/media_understanding.sh course-eval JOB_ID /absolute/path/to/report.txt > /mnt/user-data/tmp/course-eval.json

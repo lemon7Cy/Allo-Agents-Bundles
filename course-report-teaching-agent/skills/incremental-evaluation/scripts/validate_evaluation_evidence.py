@@ -209,6 +209,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True)
     parser.add_argument("--source", required=True)
+    parser.add_argument("--video-evidence")
     parser.add_argument("--rubric", default=str(Path(__file__).resolve().parent.parent / "rubric.md"))
     parser.add_argument("--allow-benchmark", action="store_true")
     args = parser.parse_args()
@@ -217,11 +218,12 @@ def main() -> int:
         data = json.loads(Path(args.data).read_text(encoding="utf-8"))
         source = Path(args.source).read_text(encoding="utf-8")
         rubric = Path(args.rubric).read_text(encoding="utf-8")
+        video_evidence = Path(args.video_evidence).read_text(encoding="utf-8") if args.video_evidence else ""
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         print(json.dumps({"status": "error", "issues": [f"input_error:{type(error).__name__}"]}, ensure_ascii=False))
         return 2
 
-    evidence = source + "\n" + rubric
+    evidence = source + "\n" + rubric + ("\n" + video_evidence if video_evidence else "")
     allowed_numbers = _number_variants(evidence) | _score_numbers(data) | ALLOWED_TEXT_NUMBERS
     issues: list[dict[str, str]] = []
     if not args.allow_benchmark:

@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from urllib.parse import unquote
 
 ALLOWED_DESIGNS = {
     "correlational",
@@ -185,6 +186,11 @@ def _validate_payload(payload: object) -> dict:
         except ValidationError as exc:
             validation_errors.append(f"{item_label}: {exc}")
             doi = None
+        official_url = _required_text(raw.get("official_url"), f"items[{index}].official_url", max_length=1000)
+        if doi and doi.casefold() not in unquote(official_url).casefold():
+            validation_errors.append(
+                f"{item_label} DOI must appear literally in official_url; use a DOI resolver/publisher URL containing it or set DOI to null"
+            )
 
         items.append(
             {
@@ -193,7 +199,7 @@ def _validate_payload(payload: object) -> dict:
                 "year": _optional_year(raw.get("year"), f"items[{index}].year"),
                 "venue": _optional_text(raw.get("venue"), f"items[{index}].venue", max_length=200),
                 "doi": doi,
-                "official_url": _required_text(raw.get("official_url"), f"items[{index}].official_url", max_length=1000),
+                "official_url": official_url,
                 "study_design": design,
                 "topic_role": role,
                 "official_page_facts": clean_facts,

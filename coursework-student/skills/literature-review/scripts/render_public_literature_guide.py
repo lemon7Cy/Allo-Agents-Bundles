@@ -42,6 +42,7 @@ OBSERVATION_SIGNAL = re.compile(
     r"DOI|发表于|收录|作者|样本|参与者|问卷|量表|访谈|任务|EEG|脑电|采用|使用|方法|分析|记录|收集|报告|显示|发现|相关|关联|关系|r\s*=|p\s*=|得分|概率|高于|低于|未支持|未发现|未观察|不显著|显著|学校",
     re.IGNORECASE,
 )
+DOI_PATTERN = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
 
 DESIGN_LABELS = {
     "correlational": "相关性研究",
@@ -114,6 +115,19 @@ def _optional_year(value: object, field: str) -> str | None:
     return text
 
 
+def _optional_doi(value: object, field: str) -> str | None:
+    text = _optional_text(value, field, max_length=200)
+    if text is None:
+        return None
+    for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "http://dx.doi.org/"):
+        if text.lower().startswith(prefix):
+            text = text[len(prefix) :]
+            break
+    if not DOI_PATTERN.fullmatch(text):
+        raise ValidationError(f"{field} must be a full DOI beginning with 10. or null; do not use an article number or URL suffix")
+    return text
+
+
 def _validate_payload(payload: object) -> dict:
     if not isinstance(payload, dict):
         raise ValidationError("input must be a JSON object")
@@ -167,7 +181,7 @@ def _validate_payload(payload: object) -> dict:
                 "first_author": _optional_text(raw.get("first_author"), f"items[{index}].first_author", max_length=120),
                 "year": _optional_year(raw.get("year"), f"items[{index}].year"),
                 "venue": _optional_text(raw.get("venue"), f"items[{index}].venue", max_length=200),
-                "doi": _optional_text(raw.get("doi"), f"items[{index}].doi", max_length=200),
+                "doi": _optional_doi(raw.get("doi"), f"items[{index}].doi"),
                 "official_url": _required_text(raw.get("official_url"), f"items[{index}].official_url", max_length=1000),
                 "study_design": design,
                 "topic_role": role,

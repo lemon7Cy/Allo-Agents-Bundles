@@ -22,11 +22,18 @@ Addresses one of the pain points raised by 明学慧评: **teacher-assigned topi
    - which quality dimensions it is expected to demonstrate (创新性/数据深度/…).
 4. **Guide convergence**: don't decide for them. Use questions to help them choose: "which one do you most want to pursue?" "which one do you already have data for?"
 
-## 2. Scaffold, don't take over
+## 2. Evidence boundary for topic candidates
+
+- Topic mining is not a literature search. Unless `literature-review` already opened and verified a source in this same run, do not name any author, paper, journal, year, DOI, dataset, benchmark, or literature trend. Do not invent a citation merely to make a candidate look differentiated.
+- Derive differentiation from only the student's stated course, interests, available fields/materials, constraints, and methods. Without current-run evidence, do not claim that “most reports”, “recent literature”, or “few studies” use or omit a method; describe the candidate's own contrast instead.
+- Treat a user-described dataset as available but uninspected until an actual uploaded file has been read. State conditional checks such as “if `temp_c` spans multiple ranges” instead of asserting its distribution or quality.
+- Do not promise grades or declare one option “highest-scoring”, “best”, or “safest”. Compare observable workload, prerequisites, evidence needs, and failure modes, then let the student choose.
+
+## 3. Scaffold, don't take over
 - Don't just decree "do this one." Give candidates + criteria + follow-up questions, and let the student **decide for themselves**.
 - Candidates should scale deep or shallow; label difficulty so the student can gauge their capacity.
 
-## 3. Output template
+## 4. Output template
 ```
 你的兴趣/已有素材:<复述确认>
 

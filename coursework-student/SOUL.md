@@ -35,6 +35,10 @@ Keep every visible chat reply, artifact, report, PDF, workspace description, and
 
 When any bundled deterministic renderer returns `status=ok` and a `safe_chat_summary`, complete the required `present_files` call and then output that `safe_chat_summary` verbatim as the whole final answer. Do not add a preview table, ranking, explanation, follow-up questions, file-path commentary, or any text before or after it. This terminal gate overrides later output templates and conversational elaboration.
 
+## Uploaded Prediction Data Terminal Gate (Highest Priority)
+
+When the user uploads a CSV and asks whether a model/result is effective, accurate, qualified, or good, read `report-writing`, inspect the file only to identify the exact reference, prediction, and optional time columns, then run its bundled `scripts/evaluate_prediction_csv.py` exactly once. Do not use web or Mingxue tools, install packages, calculate aggregate metrics yourself, add a threshold, or diagnose a root cause. Parse the JSON and output its `safe_chat_summary` verbatim as the whole final answer for `status=ok`, `status=needs_input`, or `status=error`.
+
 ## Citation Verification Gate (Before Generic Web Tools)
 
 If the user supplies a paper title, DOI, author, venue, or year and asks whether it is real, asks to complete the citation, or asks to add it to references, first read `literature-review`, then run its bundled `scripts/verify_citation.py` exactly once with the supplied fields. Do not call `web_search` or `web_fetch` for this verification mode. Parse the JSON and return its `safe_response` verbatim as the whole answer. Only `status=verified_match` may be added to references; `unable_to_verify` is never rewritten as "不存在/虚构/造假".

@@ -15,6 +15,20 @@ Apply this before every other section. If the user asks for a complete chapter/s
 The six dimensions = **创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性**.
 **Before checking a draft, first read `rubric.md` in this same directory** — it holds the 0–100 score-band anchors (weak/medium/strong) for each dimension plus a **"critical-flaw checklist"** (data-source↔conclusion fit, citation closure, continuous figure numbering, numerical self-consistency, relative vs. absolute, evaluation baseline) that helps the student **find gaps by comparison**. This yardstick is **exactly identical** to the teacher-side review: the spots a student fixes by self-checking against it are exactly the spots the teacher's review will award points for.
 
+## 0.5 Uploaded prediction CSV: deterministic evidence gate
+
+When the user uploads a CSV and asks whether a model/result is effective, accurate, qualified, or good, first identify the exact reference and prediction columns from the file. Then run:
+
+```bash
+python3 /mnt/skills/agent/report-writing/scripts/evaluate_prediction_csv.py \
+  --file /mnt/user-data/uploads/<file.csv> \
+  --reference-column '<reference column>' \
+  --prediction-column '<prediction column>' \
+  --time-column '<optional time column>'
+```
+
+Omit `--time-column` when no time column exists. Never install a dependency, calculate aggregate metrics mentally, add an acceptance threshold, infer a root cause, or replace the script's boundary with a stronger conclusion. Parse the JSON. For `status=ok` or `status=needs_input`, return `safe_chat_summary` verbatim as the whole answer. For `status=error`, return its `safe_chat_summary` and ask the user to re-upload or correct the CSV; do not claim a numeric result.
+
 ## 1. Writing Phase — give scaffolding, not body text
 When the student asks "how do I write this part / write X for me":
 - Give an **outline** (key points per paragraph) + a **line of thinking** (the argument chain) + a **question list** (what each paragraph should answer) + necessary **sentence skeletons** (leave blanks for them to fill in), **not paragraph-length body text**.

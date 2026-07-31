@@ -33,7 +33,55 @@ Addresses one of the pain points raised by 明学慧评: **teacher-assigned topi
 - Don't just decree "do this one." Give candidates + criteria + follow-up questions, and let the student **decide for themselves**.
 - Candidates should scale deep or shallow; label difficulty so the student can gauge their capacity.
 
-## 4. Output template
+## 4. Deterministic topic-candidate artifact
+
+For a substantive request for 3-5 topic candidates, never hand-write `/mnt/user-data/outputs/选题候选.md`. Write one JSON ledger to `/mnt/user-data/tmp/topic_candidates.json` with this shape:
+
+```json
+{
+  "course": "user-supplied course",
+  "interest": "user-supplied interest",
+  "requirements": ["current-run course requirement"],
+  "dataset": {
+    "description": "user-supplied dataset description",
+    "inspected": false,
+    "fields": ["exact user-supplied field names"]
+  },
+  "candidates": [
+    {
+      "title": "candidate title",
+      "course_fit": "observable match to the stated course requirements",
+      "differentiation": "contrast created from the stated data, method, condition, or evaluation dimension",
+      "data_requirements": [
+        {
+          "item": "required input or prerequisite",
+          "status": "stated-available|needs-inspection|needs-derivation|missing-or-external",
+          "basis": "what the user or an opened file currently establishes"
+        }
+      ],
+      "method_steps": ["bounded method step"],
+      "difficulty": "low|medium|high",
+      "difficulty_basis": ["observable source of work"],
+      "risks": ["specific failure condition"],
+      "go_no_go_checks": ["check before choosing this direction"]
+    }
+  ]
+}
+```
+
+Set `dataset.inspected=false` unless an actual uploaded data file was read successfully in this run. Never label an OCV-SOC curve, equivalent-circuit parameter, ground truth, temperature range, sample adequacy, or train/test suitability as available merely because the user listed generic CSV fields; put it under `needs-inspection`, `needs-derivation`, or `missing-or-external` as appropriate.
+
+Then run exactly:
+
+```bash
+python3 /mnt/skills/agent/topic-mining/scripts/render_topic_candidates.py \
+  --input /mnt/user-data/tmp/topic_candidates.json \
+  --output /mnt/user-data/outputs/选题候选.md
+```
+
+The renderer removes unsupported citations, prevalence claims, rankings, promises, and absolute sufficiency claims. Do not rewrite the ledger merely to restore normalized content. On `status=ok`, call `present_files` and return `safe_chat_summary` verbatim as the whole final answer. On a structural error, fix every listed issue in one edit and rerun at most once.
+
+## 5. Output template
 ```
 你的兴趣/已有素材:<复述确认>
 

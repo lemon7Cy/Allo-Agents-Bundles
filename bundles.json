@@ -41,7 +41,7 @@
       "display_name": "课程报告助手（学生端）",
       "description": "面向学生的课程报告助手——辅助探索选题、文献导读、撰写与修订，提供结构、证据和自检支持。",
       "bundle_version": 2,
-      "content_revision": 34,
+      "content_revision": 35,
       "files": [
         "SOUL.md",
         "capabilities.yaml",
@@ -56,6 +56,7 @@
         "skills/report-writing/SKILL.md",
         "skills/report-writing/rubric.md",
         "skills/topic-mining/SKILL.md",
+        "skills/topic-mining/scripts/render_topic_candidates.py",
         "workspace.yaml"
       ]
     },

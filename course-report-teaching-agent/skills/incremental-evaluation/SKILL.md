@@ -35,6 +35,8 @@ Use this only when the user explicitly asks to score, quantify, compare scores, 
 
 - Use only the uploaded drafts, `rubric.md`, and current-run tool results as factual support.
 - Do not convert RMSE into a different metric, invent an acceptance threshold, prescribe a fixed reference count, or name a remembered dataset.
+- Apply the same boundary to examples, suggested experiments, self-checks, and teacher follow-up questions. Use source-provided values or symbolic wording; never invent a concrete initial value, range, comparison count, or target merely to make a question sound specific.
+- Treat filenames only as identifiers. Determine whether a revision is language-only or substantive from the actual content comparison, never from words in the filename.
 - When no acceptance criterion is available, report the observed result and ask for the course/project baseline.
 - Every high-priority issue must remain closed-loop: `material evidence → student action → student self-check → teacher verification`.
 - Video evidence may add timestamped oral corroboration and a coverage comparison, but it must never raise a written-report score.
@@ -86,4 +88,4 @@ The script prints the six-dimension increment table and writes the radar chart t
 
 Do not export a PDF by default. If the user explicitly asks for a downloadable or printable evaluation, use `report-pdf-export` after the evaluation is complete. For a quantitative PDF, the scorecard and radar must use identical six-dimension values and the radar must be the final section. For a qualitative PDF, omit both scorecard and radar.
 
-Before rendering a report-based PDF, run `scripts/validate_evaluation_evidence.py` against the JSON, source report Markdown, and `rubric.md`. Fix a failed validation from current evidence; never bypass it.
+Before rendering a report-based PDF, run `scripts/validate_evaluation_evidence.py` with `/app/backend/.venv/bin/python` against the JSON, source report Markdown, and `rubric.md`. Fix a failed validation from current evidence; never bypass it, install packages, or continue to rendering after a blocked/failed validation.

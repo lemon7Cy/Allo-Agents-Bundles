@@ -30,25 +30,26 @@ professional A4 PDF. It does not score or judge — it only lays out existing fi
    - `video_only` or `report_video_qualitative`: timestamped evidence and key frames are allowed, but no written-report scorecard or radar.
    Put real, already-established content only — never fabricate scores or findings.
 2. Validate `report.json` in a separate command. Do not combine validation and rendering, do not
-   use a heredoc or inline Python to create/repair the document, and do not install packages:
+   use a heredoc or inline Python to create/repair the document, do not probe for alternate
+   interpreters, and do not install packages:
 
    ```bash
-   /app/backend/.venv/bin/python -m json.tool /mnt/user-data/outputs/report.json >/dev/null
+   python3 -m json.tool /mnt/user-data/outputs/report.json >/dev/null
    ```
 
    Build or repair `report.json` only with `write_file`. Inside JSON string values, prefer Chinese
    corner quotes `「」` instead of unescaped ASCII double quotes.
-3. Run the renderer with the same bundled interpreter, writing to `/mnt/user-data/outputs/` so the
+3. Run the renderer with `python3`, writing to `/mnt/user-data/outputs/` so the
    file is delivered:
 
    ```bash
-   /app/backend/.venv/bin/python /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py \
+   python3 /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py \
      --data /mnt/user-data/outputs/report.json \
      --out "/mnt/user-data/outputs/锂电池SOC-SOH联合估计报告-课程报告评价.pdf" \
      --job c672ae77-...   # ONLY for a defense-video evaluation — see below
    ```
 
-   If the bundled interpreter reports that `reportlab` or `Pillow` is unavailable, or that no
+   If the interpreter reports that `reportlab` or `Pillow` is unavailable, or that no
    embeddable CJK font exists, stop and report a server dependency problem. Never run `pip install`,
    never switch to the plain `python3`, and never retry by embedding the whole report in a shell
    command.
@@ -83,7 +84,7 @@ renderer parses a practical subset (`#`/`##`/`###` headings, `-`/`*` bullets, pi
 tables, `**bold**`, paragraphs):
 
 ```bash
-/app/backend/.venv/bin/python /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py --markdown eval.md --out "/mnt/user-data/outputs/不同温度下锂离子电池SOC估计-课程报告评价.pdf"
+python3 /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py --markdown eval.md --out "/mnt/user-data/outputs/不同温度下锂离子电池SOC估计-课程报告评价.pdf"
 ```
 
 Prefer `--data` (JSON) when you can — it gives the tidiest, most deterministic layout.

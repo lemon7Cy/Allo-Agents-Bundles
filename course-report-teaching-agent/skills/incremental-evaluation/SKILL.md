@@ -88,4 +88,4 @@ The script prints the six-dimension increment table and writes the radar chart t
 
 Do not export a PDF by default. If the user explicitly asks for a downloadable or printable evaluation, use `report-pdf-export` after the evaluation is complete. For a quantitative PDF, the scorecard and radar must use identical six-dimension values and the radar must be the final section. For a qualitative PDF, omit both scorecard and radar.
 
-Before rendering a report-based PDF, run `scripts/validate_evaluation_evidence.py` with `/app/backend/.venv/bin/python` against the JSON, source report Markdown, and `rubric.md`. Fix a failed validation from current evidence; never bypass it, install packages, or continue to rendering after a blocked/failed validation.
+Before rendering a report-based PDF, run `scripts/validate_evaluation_evidence.py` with `python3` against the JSON and source report Markdown. The validator loads the adjacent bundled `rubric.md` itself, so do not pass a second `/mnt/skills/agent/...` rubric path. Fix a failed validation from current evidence; never bypass it, install packages, or continue to rendering after a blocked/failed validation.

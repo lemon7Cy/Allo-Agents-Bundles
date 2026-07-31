@@ -17,6 +17,9 @@ EXTERNAL_ASSERTION_PATTERNS = (
     re.compile(r"(?:至少|不少于|不低于|≥|>=)\s*\d+\s*(?:篇|处|条|个)"),
 )
 REMEMBERED_DATASET_TERMS = ("NASA", "PCoE")
+QUALITY_LABELS = ("合格", "不合格", "达标", "不达标", "优秀", "良好")
+BOOK_TITLE_RE = re.compile(r"《([^》]+)》")
+LATIN_EXAMPLE_SOURCE_RE = re.compile(r"(?:如|例如)\s*([A-Z][A-Za-z]+(?:\s*(?:&|and)\s*[A-Z][A-Za-z]+)+)")
 ALLOWED_TEXT_NUMBERS = {"0", "1", "2", "3", "4", "5", "6", "100"}
 CANONICAL_DIMENSIONS = ("创新性", "数据分析深度", "完整性", "文献引用", "结论合理性", "格式规范性")
 QUANTITATIVE_MODES = {"quantitative_six_dimension", "incremental_quantitative"}
@@ -183,11 +186,30 @@ def _quantitative_structure_issues(data: Any) -> list[dict[str, str]]:
     return issues
 
 
+def _unsupported_named_or_quality_issues(data: Any, evidence: str) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    for path, text in _walk_strings(data):
+        if path and path[0] == "meta":
+            continue
+        for label in QUALITY_LABELS:
+            if label in text and label not in evidence:
+                issues.append({"path": ".".join(path), "kind": "unsupported_quality_label", "value": label})
+        for match in BOOK_TITLE_RE.finditer(text):
+            title = match.group(1).strip()
+            if title and title not in evidence:
+                issues.append({"path": ".".join(path), "kind": "ungrounded_named_source", "value": title})
+        for match in LATIN_EXAMPLE_SOURCE_RE.finditer(text):
+            source = match.group(1).strip()
+            if source and source not in evidence:
+                issues.append({"path": ".".join(path), "kind": "ungrounded_named_source", "value": source})
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True)
     parser.add_argument("--source", required=True)
-    parser.add_argument("--rubric", required=True)
+    parser.add_argument("--rubric", default=str(Path(__file__).resolve().parent.parent / "rubric.md"))
     parser.add_argument("--allow-benchmark", action="store_true")
     args = parser.parse_args()
 
@@ -205,6 +227,7 @@ def main() -> int:
     if not args.allow_benchmark:
         issues.extend(_benchmark_issues(data))
     issues.extend(_quantitative_structure_issues(data))
+    issues.extend(_unsupported_named_or_quality_issues(data, evidence))
 
     for path, text in _walk_strings(data):
         if path and path[0] == "meta":

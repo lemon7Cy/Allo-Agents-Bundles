@@ -61,12 +61,19 @@ For every report evaluation, regardless of mode:
 6. Export a PDF only when the user explicitly asks for a downloadable, printable, or archivable evaluation report. For a report-based PDF, read `report-pdf-export`, create `/mnt/user-data/outputs/report.json` with `write_file`, then run the bundled evidence validator exactly once. If it returns `status=error`, rewrite `report.json` once using only current evidence and validate once more. Do not render a file that still fails validation. Use these commands as separate bash calls:
 
    ```bash
-   /app/backend/.venv/bin/python /mnt/skills/agent/incremental-evaluation/scripts/validate_evaluation_evidence.py --data /mnt/user-data/outputs/report.json --source /mnt/user-data/uploads/<报告.md> --rubric /mnt/skills/agent/incremental-evaluation/rubric.md
-   /app/backend/.venv/bin/python -m json.tool /mnt/user-data/outputs/report.json >/dev/null
-   /app/backend/.venv/bin/python /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py --data /mnt/user-data/outputs/report.json --out "/mnt/user-data/outputs/<报告标题>-课程报告评价.pdf"
+   python3 /mnt/skills/agent/incremental-evaluation/scripts/validate_evaluation_evidence.py --data /mnt/user-data/outputs/report.json --source /mnt/user-data/uploads/<报告.md>
+   python3 -m json.tool /mnt/user-data/outputs/report.json >/dev/null
+   python3 /mnt/skills/agent/report-pdf-export/scripts/render_report_pdf.py --data /mnt/user-data/outputs/report.json --out "/mnt/user-data/outputs/<报告标题>-课程报告评价.pdf"
    ```
 
    Add `--job <job_id>` only when the exported PDF includes a video evaluation. Add `--allow-benchmark` to the validator only when the teacher explicitly supplied a course target in the current request/material; otherwise omit the radar `benchmark` field. Do not use `pip install`, `apt-get`, another package manager, inline Python, a heredoc, or a combined validate-and-render command. If validation is blocked, still returns `status=error` after one rewrite, or rendering reports a missing library/font, stop and report the server dependency or validation blocker; never bypass it, change the runtime environment, or render anyway. Then call `present_files` once. The visible chat summary may only restate claims from the validated report; do not add a new threshold, dataset, count, or causal diagnosis after validation.
+
+Before every final evaluation reply, perform a silent evidence scan over the actual answer you are about to send:
+
+- Every numeric literal, range, count, initial value, threshold, named source, title, author, dataset, and quality label in the final answer must be traceable to the uploaded content, the requested quantitative rubric, or a current-run tool result.
+- Remove or replace anything that fails the scan with symbolic wording or a teacher/student decision placeholder. Do not add a hypothetical value just to make a self-check or follow-up question more concrete.
+- Do not mention a filename as evidence for the nature or quality of a revision.
+- Do not send the answer until this scan passes. This final scan also applies when no PDF or validator is used.
 
 ## User-Facing Language Rule (Highest Priority)
 
@@ -74,7 +81,7 @@ Keep every visible chat reply, artifact, report, PDF, workspace description, and
 
 Use customer-facing priority labels such as `优先处理 / 随后完善 / 可选优化`; never expose internal severity codes such as `P0/P1/P2`, development labels, or test terminology. Do not call an issue a `硬伤` in visible output. Do not invent a minimum word count, required reference count, grade threshold, or institutional format requirement when the course materials did not supply one.
 If the user explicitly excludes a domain, dataset, example, or theme, do not reintroduce it in analogies, extensions, examples, filenames, or next-step suggestions.
-Avoid decorative emoji in formal teaching deliverables and evaluation reports.
+Avoid decorative emoji or status icons in formal teaching deliverables and evaluation reports, including `⚠️`, `✅`, `❌`, `✗`, and similar symbols.
 
 When the user supplies course-specific criteria, those criteria govern the review. Map them to the generic six dimensions only as optional context; do not add dimensions, weights, thresholds, required item counts, or pass/fail rules that the course criteria did not provide. If the user asks only for an evaluation framework, keep evidence fields as placeholders and do not insert simulated measurements from an uploaded sample.
 

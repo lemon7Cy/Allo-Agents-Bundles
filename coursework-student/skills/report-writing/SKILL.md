@@ -1,11 +1,20 @@
 ---
 name: report-writing
-description: Create editable coursework paper/report drafts and help revise them with evidence-aware writing, outlines, analysis plans, source boundaries, and six-dimension feedback. Read this skill when a student asks to write a first draft, complete or revise a report/chapter/section, generate a downloadable document, check a draft, or plan the analysis.
+description: Create editable coursework paper/report drafts and help revise them with evidence-aware writing, outlines, analysis plans, source boundaries, and six-dimension feedback. Read this skill when a student asks to write a first draft, complete or revise a report/chapter/section, check a draft, or plan the analysis. When PDF, Word, or DOCX is explicitly requested, pair this skill with document-export in the same turn.
 ---
 
 # Coursework Drafting and Revision
 
 Deliver a useful first version at the level requested, then help the student improve it with materials, data, and verified sources. Never replace missing evidence with plausible-sounding facts.
+
+## 0. Explicit PDF / Word handoff (Highest Priority)
+
+When the request explicitly says PDF, Word, DOCX, printable, or editable Word document, read `/mnt/skills/agent/document-export/SKILL.md` before attempting any conversion. This gate overrides the normal Markdown-only delivery in the workflow below.
+
+1. Write the completed Markdown source to `/mnt/user-data/tmp/<clear-name>.md`, not to `outputs`, unless the user also requested Markdown.
+2. Run the bundled `document-export` command exactly as a top-level shell command, with `--input` pointing to the temporary Markdown and `--out` pointing to the requested `.pdf` or `.docx` under `/mnt/user-data/outputs/`.
+3. Do not probe for Pandoc or `python-docx`, run `pip install`, create a conversion script, or place a literal `/mnt/user-data/outputs/...` path inside custom Python. Those routes can create a transient file that appears in one shell but is unavailable to the artifact download service.
+4. Present the requested file only after the renderer reports `status=ok` and a separate top-level existence check succeeds. If the renderer fails, provide the completed content without claiming that the requested file exists.
 
 ## 0. Complete first-draft workflow
 
@@ -15,7 +24,7 @@ When the user asks for a paper/report first draft, a complete draft, or body tex
 2. If the user asks for verifiable literature or citations, use `literature-review` and include only sources verified in the current run. If verification cannot be completed, keep the reference entry or supporting claim visibly marked `待核实`; never invent bibliographic fields.
 3. Write actual connected prose for the requested sections. A complete first draft normally includes the title, abstract, keywords, introduction/problem statement, related work or conceptual basis, research questions, research design, data and analysis plan, expected contribution, conclusion boundary, and references or a verification list. Adapt this structure to the user's request instead of forcing every heading.
 4. When the user has not supplied data or results, write methods and analysis in proposed/future tense. Use explicit placeholders such as `[待补：样本来源]`, `[待补：量表或指标定义]`, and `[待数据分析后填写]`. Do not manufacture a completed experiment or positive conclusion.
-5. Save the complete draft to `/mnt/user-data/outputs/<课题简称>-论文初稿.md` with `write_file`, then call `present_files`. Do this even when the user only says “写个初稿” and does not separately ask for a file.
+5. With no explicit PDF/Word request, save the complete draft to `/mnt/user-data/outputs/<课题简称>-论文初稿.md` with `write_file`, then call `present_files`. Do this even when the user only says “写个初稿” and does not separately ask for a file. With an explicit PDF/Word request, follow the handoff gate above instead.
 6. Reply with a concise completion summary, name the file, and state which evidence fields still need the user's material. Do not expose `/mnt/...` paths or internal tool names. Do not end with only an outline or questions.
 
 ## 0. Six-Dimension Quality Standard (the unified rubric for checking drafts)

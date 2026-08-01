@@ -67,6 +67,34 @@ def _is_table_separator(line: str) -> bool:
     return bool(cells) and all(_TABLE_SEPARATOR.fullmatch(cell.replace(" ", "")) for cell in cells)
 
 
+def _append_quote_blocks(blocks: list[Block], quote_lines: list[str]) -> None:
+    pending: list[str] = []
+
+    def flush_quote() -> None:
+        if pending:
+            blocks.append(Block("quote", text=" ".join(part for part in pending if part).strip()))
+            pending.clear()
+
+    index = 0
+    while index < len(quote_lines):
+        line = quote_lines[index]
+        if index + 1 < len(quote_lines) and "|" in line and _is_table_separator(quote_lines[index + 1]):
+            flush_quote()
+            rows = [_split_table_row(line)]
+            index += 2
+            while index < len(quote_lines) and "|" in quote_lines[index] and quote_lines[index].strip():
+                rows.append(_split_table_row(quote_lines[index]))
+                index += 1
+            blocks.append(Block("table", rows=rows))
+            continue
+        if line:
+            pending.append(line)
+        else:
+            flush_quote()
+        index += 1
+    flush_quote()
+
+
 def parse_markdown(source: str) -> list[Block]:
     lines = source.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     blocks: list[Block] = []
@@ -132,7 +160,7 @@ def parse_markdown(source: str) -> list[Block]:
             while index < len(lines) and lines[index].strip().startswith(">"):
                 quote.append(lines[index].strip()[1:].strip())
                 index += 1
-            blocks.append(Block("quote", text=" ".join(quote)))
+            _append_quote_blocks(blocks, quote)
             continue
 
         if re.fullmatch(r"(?:-{3,}|\*{3,}|_{3,})", stripped):

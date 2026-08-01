@@ -6,7 +6,7 @@
       "display_name": "教学助手",
       "description": "面向课程报告场景的教学助手，支持探索选题、材料导读、报告撰写、文稿修订、六维评价、初终稿增量分析和教学反思。",
       "bundle_version": 2,
-      "content_revision": 73,
+      "content_revision": 74,
       "files": [
         "SOUL.md",
         "capabilities.yaml",
@@ -49,7 +49,7 @@
       "display_name": "课程报告助手（学生端）",
       "description": "面向学生的课程报告助手——支持探索选题、文献导读、生成可编辑初稿、撰写修订和成果下载。",
       "bundle_version": 2,
-      "content_revision": 51,
+      "content_revision": 52,
       "files": [
         "SOUL.md",
         "capabilities.yaml",

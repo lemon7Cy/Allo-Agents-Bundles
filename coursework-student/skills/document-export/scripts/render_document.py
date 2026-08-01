@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
@@ -182,6 +183,8 @@ def parse_markdown(source: str) -> list[Block]:
 
 
 def _normalize_inline(text: str) -> str:
+    text = html.unescape(text)
+    text = re.sub(r"\\([\\`*_{}\[\]()#+\-.!|>])", r"\1", text)
     for source, replacement in _INLINE_REPLACEMENTS.items():
         text = text.replace(source, replacement)
     text = re.sub(r"!\[([^]]*)\]\([^)]+\)", r"\1", text)
@@ -247,14 +250,31 @@ def _register_pdf_fonts():
     raise RuntimeError("no embeddable CJK font found")
 
 
-def render_pdf(blocks: list[Block], output: Path, title: str | None) -> None:
+def _without_duplicate_title(blocks: list[Block], title: str | None) -> list[Block]:
+    if not title or not blocks or blocks[0].kind != "heading" or blocks[0].level != 1:
+        return blocks
+
+    def normalized(value: str) -> str:
+        return re.sub(r"\s+", "", _normalize_inline(value)).casefold()
+
+    return blocks[1:] if normalized(blocks[0].text) == normalized(title) else blocks
+
+
+def render_pdf(blocks: list[Block], output: Path, title: str | None, *, one_page: bool = False) -> int:
     try:
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_CENTER, TA_LEFT
-        from reportlab.lib.pagesizes import LETTER
+        from reportlab.lib.pagesizes import A4, LETTER, landscape
         from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.units import mm
-        from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import (
+            HRFlowable,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
     except ImportError as exc:
         raise RuntimeError("reportlab is required for PDF export") from exc
 
@@ -264,32 +284,94 @@ def render_pdf(blocks: list[Block], output: Path, title: str | None) -> None:
     accent = colors.HexColor("#2E74B5")
     accent_dark = colors.HexColor("#1F4D78")
     rule = colors.HexColor("#DCE3EC")
+    if one_page:
+        metrics = {
+            "title_size": 13,
+            "title_leading": 16,
+            "title_after": 4,
+            "h1_size": 10.5,
+            "h1_leading": 12,
+            "h1_before": 5,
+            "h1_after": 3,
+            "h2_size": 9.5,
+            "h2_leading": 11,
+            "h2_before": 4,
+            "h2_after": 2,
+            "h3_size": 9,
+            "h3_leading": 10.5,
+            "h3_before": 3,
+            "h3_after": 2,
+            "body_size": 8,
+            "body_leading": 9.2,
+            "body_after": 1,
+            "quote_size": 7.5,
+            "quote_leading": 8.8,
+            "code_size": 7.2,
+            "code_leading": 8.4,
+            "cell_size": 7,
+            "cell_leading": 8.2,
+        }
+    else:
+        metrics = {
+            "title_size": 20,
+            "title_leading": 28,
+            "title_after": 12,
+            "h1_size": 16,
+            "h1_leading": 20,
+            "h1_before": 18,
+            "h1_after": 10,
+            "h2_size": 13,
+            "h2_leading": 17,
+            "h2_before": 14,
+            "h2_after": 7,
+            "h3_size": 12,
+            "h3_leading": 15,
+            "h3_before": 10,
+            "h3_after": 5,
+            "body_size": 11,
+            "body_leading": 13.75,
+            "body_after": 6,
+            "quote_size": 10,
+            "quote_leading": 16,
+            "code_size": 9.5,
+            "code_leading": 15,
+            "cell_size": 9,
+            "cell_leading": 13,
+        }
     styles = {
-        "title": ParagraphStyle("title", fontName=bold, fontSize=20, leading=28, alignment=TA_CENTER, textColor=ink, spaceAfter=12),
-        "h1": ParagraphStyle("h1", fontName=bold, fontSize=16, leading=20, textColor=accent, spaceBefore=18, spaceAfter=10, keepWithNext=True),
-        "h2": ParagraphStyle("h2", fontName=bold, fontSize=13, leading=17, textColor=accent, spaceBefore=14, spaceAfter=7, keepWithNext=True),
-        "h3": ParagraphStyle("h3", fontName=bold, fontSize=12, leading=15, textColor=accent_dark, spaceBefore=10, spaceAfter=5, keepWithNext=True),
-        "body": ParagraphStyle("body", fontName=regular, fontSize=11, leading=13.75, alignment=TA_LEFT, textColor=ink, spaceAfter=6),
-        "list": ParagraphStyle("list", fontName=regular, fontSize=11, leading=13.75, leftIndent=27, firstLineIndent=-13.5, textColor=ink, spaceAfter=4),
-        "quote": ParagraphStyle("quote", fontName=regular, fontSize=10, leading=16, leftIndent=10, rightIndent=8, textColor=muted),
-        "code": ParagraphStyle("code", fontName=regular, fontSize=9.5, leading=15, leftIndent=8, rightIndent=8, textColor=colors.HexColor("#334155"), backColor=colors.HexColor("#F3F6FA"), borderPadding=7, spaceAfter=7),
-        "cell": ParagraphStyle("cell", fontName=regular, fontSize=9, leading=13, textColor=ink),
-        "cellhead": ParagraphStyle("cellhead", fontName=bold, fontSize=9, leading=13, textColor=ink),
+        "title": ParagraphStyle("title", fontName=bold, fontSize=metrics["title_size"], leading=metrics["title_leading"], alignment=TA_CENTER, textColor=ink, spaceAfter=metrics["title_after"]),
+        "h1": ParagraphStyle("h1", fontName=bold, fontSize=metrics["h1_size"], leading=metrics["h1_leading"], textColor=accent, spaceBefore=metrics["h1_before"], spaceAfter=metrics["h1_after"], keepWithNext=True),
+        "h2": ParagraphStyle("h2", fontName=bold, fontSize=metrics["h2_size"], leading=metrics["h2_leading"], textColor=accent, spaceBefore=metrics["h2_before"], spaceAfter=metrics["h2_after"], keepWithNext=True),
+        "h3": ParagraphStyle("h3", fontName=bold, fontSize=metrics["h3_size"], leading=metrics["h3_leading"], textColor=accent_dark, spaceBefore=metrics["h3_before"], spaceAfter=metrics["h3_after"], keepWithNext=True),
+        "body": ParagraphStyle("body", fontName=regular, fontSize=metrics["body_size"], leading=metrics["body_leading"], alignment=TA_LEFT, textColor=ink, spaceAfter=metrics["body_after"]),
+        "list": ParagraphStyle("list", fontName=regular, fontSize=metrics["body_size"], leading=metrics["body_leading"], leftIndent=18 if one_page else 27, firstLineIndent=-9 if one_page else -13.5, textColor=ink, spaceAfter=1 if one_page else 4),
+        "quote": ParagraphStyle("quote", fontName=regular, fontSize=metrics["quote_size"], leading=metrics["quote_leading"], leftIndent=6 if one_page else 10, rightIndent=5 if one_page else 8, textColor=muted),
+        "code": ParagraphStyle("code", fontName=regular, fontSize=metrics["code_size"], leading=metrics["code_leading"], leftIndent=5 if one_page else 8, rightIndent=5 if one_page else 8, textColor=colors.HexColor("#334155"), backColor=colors.HexColor("#F3F6FA"), borderPadding=4 if one_page else 7, spaceAfter=2 if one_page else 7),
+        "cell": ParagraphStyle("cell", fontName=regular, fontSize=metrics["cell_size"], leading=metrics["cell_leading"], textColor=ink),
+        "cellhead": ParagraphStyle("cellhead", fontName=bold, fontSize=metrics["cell_size"], leading=metrics["cell_leading"], textColor=ink),
     }
-    doc = SimpleDocTemplate(
+
+    class CountingDocTemplate(SimpleDocTemplate):
+        page_count = 0
+
+        def afterPage(self) -> None:
+            self.page_count += 1
+
+    margin = 10 * mm if one_page else 25.4 * mm
+    doc = CountingDocTemplate(
         str(output),
-        pagesize=LETTER,
-        rightMargin=25.4 * mm,
-        leftMargin=25.4 * mm,
-        topMargin=25.4 * mm,
-        bottomMargin=25.4 * mm,
+        pagesize=landscape(A4) if one_page else LETTER,
+        rightMargin=margin,
+        leftMargin=margin,
+        topMargin=margin,
+        bottomMargin=margin,
         title=title or "Allo 文档",
         author="Allo 教育助手",
     )
     story = []
     if title:
-        story.extend([Paragraph(_pdf_markup(title), styles["title"]), HRFlowable(width="100%", thickness=0.7, color=rule), Spacer(1, 7)])
-    for block in blocks:
+        story.extend([Paragraph(_pdf_markup(title), styles["title"]), HRFlowable(width="100%", thickness=0.7, color=rule), Spacer(1, 2 if one_page else 7)])
+    for block in _without_duplicate_title(blocks, title):
         if block.kind == "heading":
             style = styles["h1" if block.level <= 1 else "h2" if block.level == 2 else "h3"]
             story.append(Paragraph(_pdf_markup(block.text), style))
@@ -301,12 +383,12 @@ def render_pdf(blocks: list[Block], output: Path, title: str | None) -> None:
                 story.append(Paragraph(f"{marker} {_pdf_markup(item)}", styles["list"]))
         elif block.kind == "quote":
             quote = Table([[Paragraph(_pdf_markup(block.text), styles["quote"])]], colWidths=[doc.width])
-            quote.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F6F8FB")), ("LINEBEFORE", (0, 0), (0, -1), 3, accent), ("LEFTPADDING", (0, 0), (-1, -1), 9), ("RIGHTPADDING", (0, 0), (-1, -1), 7), ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7)]))
-            story.extend([quote, Spacer(1, 7)])
+            quote.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F6F8FB")), ("LINEBEFORE", (0, 0), (0, -1), 2 if one_page else 3, accent), ("LEFTPADDING", (0, 0), (-1, -1), 5 if one_page else 9), ("RIGHTPADDING", (0, 0), (-1, -1), 4 if one_page else 7), ("TOPPADDING", (0, 0), (-1, -1), 3 if one_page else 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 3 if one_page else 7)]))
+            story.extend([quote, Spacer(1, 2 if one_page else 7)])
         elif block.kind == "code":
             story.append(Paragraph(_pdf_markup(block.text), styles["code"]))
         elif block.kind == "rule":
-            story.extend([Spacer(1, 3), HRFlowable(width="100%", thickness=0.6, color=rule), Spacer(1, 5)])
+            story.extend([Spacer(1, 1 if one_page else 3), HRFlowable(width="100%", thickness=0.6, color=rule), Spacer(1, 1 if one_page else 5)])
         elif block.kind == "table" and block.rows:
             width = max(len(row) for row in block.rows)
             rows = [row + [""] * (width - len(row)) for row in block.rows]
@@ -316,11 +398,12 @@ def render_pdf(blocks: list[Block], output: Path, title: str | None) -> None:
                 pdf_rows.append([Paragraph(_pdf_markup(cell), style) for cell in row])
             widths_dxa = _table_widths(rows)
             table = Table(pdf_rows, colWidths=[doc.width * column_width / 9360 for column_width in widths_dxa], repeatRows=1, hAlign="LEFT")
-            table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF5")), ("BOX", (0, 0), (-1, -1), 0.6, rule), ("INNERGRID", (0, 0), (-1, -1), 0.35, rule), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
-            story.extend([table, Spacer(1, 8)])
+            table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF5")), ("BOX", (0, 0), (-1, -1), 0.6, rule), ("INNERGRID", (0, 0), (-1, -1), 0.35, rule), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 3 if one_page else 6), ("RIGHTPADDING", (0, 0), (-1, -1), 3 if one_page else 6), ("TOPPADDING", (0, 0), (-1, -1), 2 if one_page else 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2 if one_page else 5)]))
+            story.extend([table, Spacer(1, 2 if one_page else 8)])
     if not story:
         raise RuntimeError("document has no renderable content")
     doc.build(story)
+    return doc.page_count
 
 
 def _w_run(text: str, *, bold: bool = False, italic: bool = False, code: bool = False) -> str:
@@ -393,7 +476,7 @@ def render_docx(blocks: list[Block], output: Path, title: str | None) -> None:
     body: list[str] = []
     if title:
         body.append(_w_paragraph(title, style="Title"))
-    for block in blocks:
+    for block in _without_duplicate_title(blocks, title):
         if block.kind == "heading":
             body.append(_w_paragraph(block.text, style=f"Heading{min(block.level, 3)}"))
         elif block.kind == "paragraph":
@@ -477,6 +560,7 @@ def main() -> int:
     parser.add_argument("--input", required=True, help="Completed Markdown source")
     parser.add_argument("--out", required=True, help="Final .pdf or .docx path under ALLO_OUTPUTS_DIR")
     parser.add_argument("--title", help="Optional document title")
+    parser.add_argument("--one-page", action="store_true", help="Render a compact landscape PDF and reject output longer than one page")
     args = parser.parse_args()
 
     source_path = Path(args.input)
@@ -487,21 +571,29 @@ def main() -> int:
         output_format = output_path.suffix.lower().lstrip(".")
         if output_format not in {"pdf", "docx"}:
             raise RuntimeError("output extension must be .pdf or .docx")
+        if args.one_page and output_format != "pdf":
+            raise RuntimeError("--one-page is supported only for PDF output")
         _allowed_output(output_path)
         source = source_path.read_text(encoding="utf-8")
         blocks = parse_markdown(source)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path = output_path.with_name(f".{output_path.stem}.{os.getpid()}.tmp{output_path.suffix}")
+        rendered_pages: int | None = None
         try:
             if output_format == "pdf":
-                render_pdf(blocks, temporary_path, args.title)
+                rendered_pages = render_pdf(blocks, temporary_path, args.title, one_page=args.one_page)
+                if args.one_page and rendered_pages != 1:
+                    raise RuntimeError(f"one-page PDF requirement not met: rendered {rendered_pages} pages; shorten the source and retry once")
             else:
                 render_docx(blocks, temporary_path, args.title)
             _validate_output(temporary_path, output_format)
             os.replace(temporary_path, output_path)
         finally:
             temporary_path.unlink(missing_ok=True)
-        print(json.dumps({"status": "ok", "format": output_format, "path": str(output_path), "bytes": output_path.stat().st_size}, ensure_ascii=False))
+        result = {"status": "ok", "format": output_format, "path": str(output_path), "bytes": output_path.stat().st_size}
+        if rendered_pages is not None:
+            result["pages"] = rendered_pages
+        print(json.dumps(result, ensure_ascii=False))
         return 0
     except Exception as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)

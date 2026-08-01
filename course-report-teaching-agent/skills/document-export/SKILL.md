@@ -26,8 +26,19 @@ bash /mnt/skills/agent/document-export/scripts/render_document.sh \
   --out "/mnt/user-data/outputs/<clear-name>.pdf"
 ```
 
-For Word, use the same command with an output ending in `.docx`. Add `--title "<document title>"` when the source has no clear top-level heading.
-5. Require the renderer's final JSON line to contain `"status": "ok"`. In a separate top-level shell call, confirm the exact output path exists and is non-empty, then call `present_files` with the real `.pdf` or `.docx` path.
+For Word, use the same command with an output ending in `.docx`. Add `--title "<document title>"` only when the source has no clear top-level heading.
+
+If the user explicitly requires a one-page PDF, make the source compact: use short labels, tables with blank cells, and only the writing space that fits on one sheet. Do not create vertical space with repeated blank paragraphs or `&nbsp;`. Render with `--one-page`:
+
+```bash
+bash /mnt/skills/agent/document-export/scripts/render_document.sh \
+  --input "/mnt/user-data/tmp/<clear-name>.md" \
+  --out "/mnt/user-data/outputs/<clear-name>.pdf" \
+  --one-page
+```
+
+The one-page mode uses a compact A4 landscape layout and rejects output longer than one page. If it rejects the first source, shorten the form once and rerender; never claim one page without a successful JSON result containing `"pages": 1`.
+5. Require the renderer's final JSON line to contain `"status": "ok"`; for an explicit one-page PDF, also require `"pages": 1`. In a separate top-level shell call, confirm the exact output path exists and is non-empty, then call `present_files` with the real `.pdf` or `.docx` path.
 6. In chat, state which formats were produced. Never describe Markdown as Word/PDF and never change only the filename extension.
 
 ## Boundaries
@@ -35,6 +46,7 @@ For Word, use the same command with an output ending in `.docx`. Add `--title "<
 - Prefer a specialized renderer when one exists. In particular, a course-evaluation PDF with radar data or video key frames must use `report-pdf-export`; use this generic exporter for teaching plans, drafts, guides, ordinary reports, and Word output.
 - Preserve evidence boundaries, citations, `待补充`, and `待核实` markers from the completed source. Rendering must not add claims or scores.
 - Use fenced code blocks only for actual source code or literal console text. Write worksheets, fill-in templates, tables, and printable forms as normal Markdown headings, paragraphs, lists, and tables; never wrap them in triple backticks, because the renderer will correctly preserve fenced content as literal text.
+- Use ordinary underscores or blank table cells for printable writing areas. Do not use HTML spacing entities as layout controls.
 - Do not check for or install Pandoc, `python-docx`, ReportLab, or any other converter dependency. Do not create a one-off conversion script, and do not embed `/mnt/user-data/outputs/...` as a literal path inside custom Python. The bundled command above is the only generic PDF/Word conversion route.
 - Use a concise, content-based Chinese filename. Sanitize `/`, `\\`, and `..`; never use a student's name when an existing evaluation policy requires naming by report/topic title.
 - Write final files only under `/mnt/user-data/outputs/`.

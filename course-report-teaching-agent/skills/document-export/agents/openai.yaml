@@ -1,0 +1,4 @@
+interface:
+  display_name: "文档格式导出"
+  short_description: "将已完成内容导出为真实 PDF 或 Word 文件"
+  default_prompt: "使用 $document-export 将当前已完成的内容按我指定的 PDF 或 Word 格式导出并提供下载。"

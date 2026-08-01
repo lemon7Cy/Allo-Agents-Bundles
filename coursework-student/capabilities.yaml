@@ -57,6 +57,12 @@ capabilities:
     required: false
     role: writing
     description: 生成带证据边界和待补标记的可编辑初稿，并按六个质量维度检查、修订和完善文稿。
+  - id: document-export
+    type: skill
+    label: PDF / Word 文档导出
+    required: false
+    role: delivery
+    description: 当用户明确指定 PDF、Word 或 DOCX 时，将已完成的初稿、选题方案、文献导读或自查报告导出为真实文件。
 
 policies:
   response_style: deliver_then_refine
@@ -71,3 +77,4 @@ entry_prompts:
   - 这是我报告的初稿（已上传），请按六个质量维度指出问题、提升点和修改优先级。
   - 我这段数据分析卡住了，帮我理清该用什么方法、怎么验证，并给我能看懂的示例代码，别直接给结论。
   - 我已经写了第三章，帮我检查论点、证据和结构是否完整。
+  - 请把完成后的课程论文初稿导出为可编辑的 Word 文档。

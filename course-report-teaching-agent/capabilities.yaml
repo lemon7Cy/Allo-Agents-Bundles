@@ -68,6 +68,12 @@ capabilities:
     required: false
     role: delivery
     description: 在用户明确需要下载、归档或打印时，将已有评价整理为清晰、规范的 PDF 报告。
+  - id: document-export
+    type: skill
+    label: PDF / Word 文档导出
+    required: false
+    role: delivery
+    description: 当用户明确指定 PDF、Word 或 DOCX 时，将已完成的教学方案、提纲、导读、报告或其他文本成果导出为真实文件。
   - id: reflection-coach
     type: workflow_step
     label: 教学反思与成长建议
@@ -88,3 +94,4 @@ entry_prompts:
   - 请对比初稿和终稿，生成增量评价、成长证据链、风险提示和反思问题。
   - 这是学生的报告讲解录像，请评价讲解，并客观核对书面报告的关键要点在讲解中是充分覆盖、简要提及还是未提及。
   - 请帮我生成教师参考评语，并列出适合追问学生的 5 个问题。
+  - 请设计一份可直接实施的教学任务方案，并导出为 Word 文档。

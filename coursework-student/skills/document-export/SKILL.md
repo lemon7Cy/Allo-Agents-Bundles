@@ -34,6 +34,7 @@ For Word, use the same command with an output ending in `.docx`. Add `--title "<
 
 - Prefer a specialized renderer when one exists. In particular, a course-evaluation PDF with radar data or video key frames must use `report-pdf-export`; use this generic exporter for teaching plans, drafts, guides, ordinary reports, and Word output.
 - Preserve evidence boundaries, citations, `待补充`, and `待核实` markers from the completed source. Rendering must not add claims or scores.
+- Use fenced code blocks only for actual source code or literal console text. Write worksheets, fill-in templates, tables, and printable forms as normal Markdown headings, paragraphs, lists, and tables; never wrap them in triple backticks, because the renderer will correctly preserve fenced content as literal text.
 - Do not check for or install Pandoc, `python-docx`, ReportLab, or any other converter dependency. Do not create a one-off conversion script, and do not embed `/mnt/user-data/outputs/...` as a literal path inside custom Python. The bundled command above is the only generic PDF/Word conversion route.
 - Use a concise, content-based Chinese filename. Sanitize `/`, `\\`, and `..`; never use a student's name when an existing evaluation policy requires naming by report/topic title.
 - Write final files only under `/mnt/user-data/outputs/`.

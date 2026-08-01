@@ -1,6 +1,6 @@
 name: coursework-student
 bundle_version: 2
-content_revision: 52
+content_revision: 53
 description: 面向学生的课程报告助手——支持探索选题、文献导读、生成可编辑初稿、撰写修订和成果下载。
 type: agentic
 dashboard: full

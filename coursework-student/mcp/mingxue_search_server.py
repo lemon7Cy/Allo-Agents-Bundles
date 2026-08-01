@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -68,6 +69,30 @@ def _markdown_quote(text: str) -> list[str]:
     return [f"> {line}" if line else ">" for line in text.splitlines()]
 
 
+def _clean_asset_excerpt(value: Any) -> str:
+    """Keep a useful caption while hiding Mingxue's internal asset record."""
+    text = str(value or "").replace("!!!ASSET_START", "").replace("!!!ASSET_END", "").strip()
+    captions = re.findall(
+        r"(?:Caption|VLM Caption|VLM Description):\s*(.*?)(?=\s+(?:Caption Source|Caption Confidence|Context before|Context after|Asset Index|Previous Asset ID|Next Asset ID|Asset Type|Asset ID|Source Doc ID|Source Document|Section):|$)",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if captions:
+        return _clip("；".join(c.strip() for c in captions if c.strip()), 600)
+    # Fallback for an asset response without a caption: remove whole metadata
+    # lines rather than exposing IDs, paths, or schema details to customers.
+    visible_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not re.search(
+            r"(?:asset_id|asset_type|source_doc_id|source_doc|source_document|file_path|schema_version|asset_index|previous_asset_id|next_asset_id|figure_asset|caption_source|caption_confidence|context_before|context_after|Figure Asset|Asset Index|Previous Asset ID|Next Asset ID|Source Doc ID|Source Document):",
+            line,
+            flags=re.IGNORECASE,
+        )
+    ]
+    return _clip(" ".join(visible_lines), 600) or "暂未提取到可展示的图注。"
+
+
 def _build_safe_outputs(
     *, question: str, requested_dataset: str, chunks: list[dict[str, Any]], assets: list[dict[str, Any]], reference_count: int
 ) -> tuple[str, str]:
@@ -113,13 +138,13 @@ def _build_safe_outputs(
 
     if assets:
         lines.extend(["## 图表资产线索", ""])
-        for item in assets[:3]:
+        for index, item in enumerate(assets[:3], start=1):
             lines.extend(
                 [
-                    f"### [{item['evidence_id']}] `{item['document']}`",
+                    f"### 图表线索 {index}",
                     "",
-                    "- 资产原文摘录：",
-                    *_markdown_quote(_clip(item["content"], 600)),
+                    "- 图表说明：",
+                    *_markdown_quote(_clean_asset_excerpt(item["content"])),
                     "- 使用边界：只把摘录中明确出现的标题／图注作为线索，查看原图后再解释趋势",
                     "",
                 ]
@@ -174,7 +199,7 @@ def _sanitize_search_result(data: dict[str, Any], *, requested_dataset: str, eff
                 "rank": rank,
                 "document": str(item.get("document") or "未提供"),
                 "similarity": item.get("similarity"),
-                "content": _clip(item.get("content"), 700),
+                "content": _clean_asset_excerpt(item.get("content")),
             }
         )
 

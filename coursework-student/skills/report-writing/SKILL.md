@@ -1,15 +1,22 @@
 ---
 name: report-writing
-description: Assist coursework-report writing and revision through scaffolding — provide outlines, lines of thinking, question lists, sentence skeletons, evidence checklists, and six-dimension draft feedback. Read this skill when a student says "help me write/revise the report," "check my draft," or "how do I write this part."
+description: Create editable coursework paper/report drafts and help revise them with evidence-aware writing, outlines, analysis plans, source boundaries, and six-dimension feedback. Read this skill when a student asks to write a first draft, complete or revise a report/chapter/section, generate a downloadable document, check a draft, or plan the analysis.
 ---
 
-# Writing and Revision Assistance Methodology
+# Coursework Drafting and Revision
 
-**Core red line: scaffold, don't ghostwrite.** You help the student make the report **better**, but the body text is written by the student themselves. Directly producing submittable paragraph-length body text / an entire report = failure.
+Deliver a useful first version at the level requested, then help the student improve it with materials, data, and verified sources. Never replace missing evidence with plausible-sounding facts.
 
-## Paste-ready request: fixed short-circuit
+## 0. Complete first-draft workflow
 
-Apply this before every other section. If the user asks for a complete chapter/section, a stated word count of body text, paste-ready prose, or a "complete template" that only needs superficial edits, do not use tools, sources, equations, code, artifacts, or the templates below. Return the exact fixed Chinese response in the agent SOUL verbatim. Do not tailor its outline, evidence list, or questions to the subject, and do not add paragraph skeletons or continue with a subject explanation.
+When the user asks for a paper/report first draft, a complete draft, or body text for a chapter or section:
+
+1. Read the user's supplied topic, course requirements, files, constraints, and requested output format. Do not require preliminary answers when the existing request is enough to begin.
+2. If the user asks for verifiable literature or citations, use `literature-review` and include only sources verified in the current run. If verification cannot be completed, keep the reference entry or supporting claim visibly marked `待核实`; never invent bibliographic fields.
+3. Write actual connected prose for the requested sections. A complete first draft normally includes the title, abstract, keywords, introduction/problem statement, related work or conceptual basis, research questions, research design, data and analysis plan, expected contribution, conclusion boundary, and references or a verification list. Adapt this structure to the user's request instead of forcing every heading.
+4. When the user has not supplied data or results, write methods and analysis in proposed/future tense. Use explicit placeholders such as `[待补：样本来源]`, `[待补：量表或指标定义]`, and `[待数据分析后填写]`. Do not manufacture a completed experiment or positive conclusion.
+5. Save the complete draft to `/mnt/user-data/outputs/<课题简称>-论文初稿.md` with `write_file`, then call `present_files`. Do this even when the user only says “写个初稿” and does not separately ask for a file.
+6. Reply with a concise completion summary, name the file, and state which evidence fields still need the user's material. Do not expose `/mnt/...` paths or internal tool names. Do not end with only an outline or questions.
 
 ## 0. Six-Dimension Quality Standard (the unified rubric for checking drafts)
 The six dimensions = **创新性、数据分析深度、完整性、文献引用、结论合理性、格式规范性**. Student self-check is qualitative by default: point out evidence, gaps, and priorities without forcing numeric scores or a radar.
@@ -29,15 +36,15 @@ python3 /mnt/skills/agent/report-writing/scripts/evaluate_prediction_csv.py \
 
 Omit `--time-column` when no time column exists. Never install a dependency, calculate aggregate metrics mentally, add an acceptance threshold, infer a root cause, or replace the script's boundary with a stronger conclusion. Parse the JSON. For `status=ok` or `status=needs_input`, return `safe_chat_summary` verbatim as the whole answer. For `status=error`, return its `safe_chat_summary` and ask the user to re-upload or correct the CSV; do not claim a numeric result.
 
-## 1. Writing Phase — give scaffolding, not body text
-When the student asks "how do I write this part / write X for me":
-- Give an **outline** (key points per paragraph) + a **line of thinking** (the argument chain) + a **question list** (what each paragraph should answer) + necessary **sentence skeletons** (leave blanks for them to fill in), **not paragraph-length body text**.
-- For data-analysis work: help them clarify **what method to use and how to validate it**, give **readable example code** (instructional, not a black box that spits out the result), and let them run it and interpret it themselves.
-- Use follow-up questions to force out their own thinking: "Which sentence is the core conclusion of this paragraph?" "Is the evidence enough? Are there counterexamples?"
+## 1. Writing and analysis support
+When the student asks how to write or analyze a specific part:
+- Match the requested depth. Provide connected draft prose when they ask for prose; provide an outline or sentence skeleton only when they ask for a framework.
+- For data-analysis work, clarify what method can answer the research question, how to validate it, and what assumptions and limitations must be reported. Give readable example code when useful.
+- Distinguish observed facts, proposed methods, expected contribution, and pending evidence in both chat and files.
 
-## 2. Revision Phase — point out problems, don't fix them for the student
+## 2. Revision phase
 When the student submits a draft (already uploaded; read it with `read_file`):
-- Go through the **six dimensions** item by item and **point out specifically**: which paragraph/sentence has what problem, why, and **which direction to revise toward** (give the direction, not rewritten body text).
+- Go through the **six dimensions** item by item and point out specifically which paragraph/sentence has what problem, why, and which direction to revise toward. When the user asks you to revise the text, provide the revised passage as well as a short explanation of the material change.
 - Distinguish "critical flaws" (broken logic, fake citations, conclusions overreaching the evidence) from "could be optimized."
 - Finally, give a **revision-priority list** (what to fix first).
 - Close the feedback loop. For every high-priority item include the evidence location, why it blocks the learning goal, the student's next action, and how the student can self-check the revision. Avoid vague praise or criticism about the person.
@@ -47,14 +54,7 @@ When the student submits a draft (already uploaded; read it with `read_file`):
 - Do not name remembered textbooks, authors, papers, datasets, standards, or prescribe a fixed reference count during draft feedback. Use only sources visible in the draft/current tools; otherwise ask for the course-designated material or suggest a generic source type to verify.
 - Before returning the review, write the complete visible draft to `/mnt/user-data/tmp/visible-review-draft.md` and run `python3 /mnt/skills/agent/report-writing/scripts/validate_visible_review.py --draft /mnt/user-data/tmp/visible-review-draft.md`. Rewrite once if blocked, validate once more, and on success copy the validated draft verbatim with no extra text. If the second validation is still blocked, return only a brief evidence-boundary message.
 
-## 3. When the student says "just write it for me"
-Be polite but firm: explain that ghostwriting does nothing for their skill growth or their grade assessment (the report will undergo incremental / competency evaluation), and instead **give a framework + guidance**. This is the product's core value, not laziness.
-
-For a direct paste-ready request, use the fixed short-circuit above without adding anything else. The user can ask a separate, legitimate question about one method or source afterward.
-
-**No slippery slope**: even after the student hands you their real data/results, you still only point out WHAT to fill in and HOW to improve it — never fill the blanks yourself and never return a "you can just reword this" near-final passage. Sentence skeletons stay skeletons: keep the blanks; connective prose between blanks must not accumulate into paragraph-length body text. When refusing, point the student at `rubric.md` for self-checking — the same six dimensions the teacher grades with.
-
-## 4. Output Template (revision)
+## 3. Output template (revision)
 ```
 初稿六维诊断:
 - 创新性:<具体问题/亮点> → 建议方向

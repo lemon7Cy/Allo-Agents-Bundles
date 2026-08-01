@@ -5,7 +5,7 @@ description: For a coursework report topic, use the 明学 knowledge base (batte
 
 # 明学 Knowledge Base · Evidence Scaffold (Student Side)
 
-**Purpose: help the student find real evidence + a reading map so they read and write it themselves — not read it through and write it for them.**
+**Purpose: find real evidence and build a traceable reading map. The `report-writing` skill may then use verified current-run evidence in an editable draft.**
 
 ## Coverage domain (judge before using)
 The 明学 knowledge base covers **lithium batteries / 储能 / SOC / SOH / RUL / capacity fade / Kalman·EKF·UKF / BMS / OCV / internal resistance**, etc.
@@ -35,7 +35,7 @@ Arguments example:
   - `数据` — experiment/OCV/test data. ⚠️ Currently NOT retrievable (returns 0 chunks — known infrastructure gap). For data-analysis needs, guide the student to run code on the raw data files instead; don't keep querying this library.
   - Omit `dataset` → papers, same as before. NOTE: `include_assets` (figures/tables) exists **only for the paper library**; for `教材/课件/数据` the `assets` list comes back empty — that's expected, use the body `chunks`. `reference_signals` come back in both `answer` and `research` modes for the paper library (research is richer); other libraries may occasionally return non-empty signals when paper PDFs are mixed in — ignore those for citation purposes.
 - **Similarity sanity check**: chunks with `sim < 0.35` are weak / likely-irrelevant hits — do NOT present them as evidence. Say the library has no direct match, mark the gap, and suggest a sharper re-query or an external database.
-- The MCP tool exposes search only; never try `/api/ask` — ask spits out a full prose answer, which equals ghostwriting and violates the scaffolding principle.
+- The MCP tool exposes search only; never try `/api/ask`, because that bypasses the scoped credential, provenance ledger, and renderer-owned evidence contract.
 
 ## Query planning (don't pile up jargon)
 Plan 2-4 possible focused queries, but execute only the best one first and run at most one follow-up if its evidence is insufficient. Use `top_k 3-5`; don't cram ten terms into one sentence. Examples:
@@ -66,9 +66,9 @@ The final deliverable must preserve the renderer-owned stable `E-…` / `A-…` 
 
 Before `write_file`, remove any line containing unsupported inference, any mixed `C/REF` identifier, any bibliographic field derived from a filename, and any claim that cannot be traced to the exact current chunk/asset. This provenance audit is mandatory even if it makes the guide shorter.
 
-## Iron rules (scaffold, don't ghostwrite)
+## Evidence rules
 - **search-only**: use only the bundled `mingxue_search` MCP tool; don't use `/api/ask` to generate a prose answer.
-- **Don't assemble the review body**: what you give is "evidence chunks + sources + which section/figure to focus on + gaps", letting the student digest and write it themselves.
+- **Do not hand-write the literature guide**: use the renderer-owned evidence output for "evidence chunks + sources + which section/figure to focus on + gaps". A later first-draft task may cite only the verified items from this current run.
 - **Cite only documents actually returned**; if nothing is found, say so — never fabricate references / DOIs / data.
 - Encourage the student to read with questions in mind: "while reading this paper, note how it defines X and how it validates Y."
 - **Never print, echo, slice, count, inspect, or test the token/environment variable.** Do not run commands such as `echo $MINGXUE_API_TOKEN`, `${#MINGXUE_API_TOKEN}`, `env`, or `printenv`. Determine availability only from the MCP tool result. If the tool is absent or reports authentication failure, say the administrator must check the preconfigured credential and fall back to public literature search.

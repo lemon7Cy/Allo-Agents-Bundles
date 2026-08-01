@@ -1,7 +1,7 @@
 name: coursework-student
 bundle_version: 2
-content_revision: 47
-description: 面向学生的课程报告助手——辅助探索选题、文献导读、撰写与修订，提供结构、证据和自检支持。
+content_revision: 48
+description: 面向学生的课程报告助手——支持探索选题、文献导读、生成可编辑初稿、撰写修订和成果下载。
 type: agentic
 dashboard: full
 # 学生端是"工作台"(workbench),不是"监控盘"(dashboard)——学生 agent 没有观测数据可监控,

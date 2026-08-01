@@ -4,7 +4,7 @@ agent: coursework-student
 metadata:
   title: 课程报告助手（学生端）
   subtitle: 从选题规划到报告完善的全过程支持
-  description: 面向学生的课程报告工作台，支持资料分析、文献导读、选题规划、结构梳理和初稿检查。
+  description: 面向学生的课程报告工作台，支持资料分析、文献导读、选题规划、可编辑初稿生成、修订自查和成果下载。
   icon: book-open
   theme:
     accent: emerald
@@ -34,7 +34,7 @@ panels:
     items:
       - 探索与选题：结合课程要求、已有资料和个人兴趣，形成具有可行性的选题方案。
       - 文献与资料：梳理关键文献、数据和课程材料，明确可核实的依据。
-      - 撰写与修订：提供提纲、分析思路、问题清单、表达建议和必要的示例代码。
+      - 撰写与修订：根据课题和已有材料生成可编辑初稿，补充分析思路、表达和必要的示例代码。
       - 自查与完善：从内容、证据、结构和格式等方面检查初稿并明确修改重点。
 
   - id: my-materials
@@ -97,8 +97,8 @@ panels:
     type: markdown_panel
     title: 使用建议
     markdown: |
-      - 先提供课程要求、现有材料、数据和初稿，建议会更具体。
-      - 需要撰写时，我会先给出框架、证据清单、问题和自检步骤。
+      - 直接说明课程、课题和希望生成的成果，即可先得到可编辑版本。
+      - 材料暂时不完整时，初稿会明确标出待补课程要求、数据、结果和来源。
       - 文献、数据和引用都以可核实来源为准，缺少信息时会明确标注。
       - 完成修订后，可以继续用六维标准复查论点、证据、结构和表达。
 
@@ -118,6 +118,6 @@ panels:
   - id: artifacts
     type: artifact_list
     title: 成果文件
-    description: 生成的选题方案、文献导读、写作建议和自查报告会集中显示在这里。
+    description: 生成的选题方案、文献导读、论文初稿、写作建议和自查报告会集中显示在这里，可直接预览或下载。
     filters:
-      kinds: [topic_plan, outline, draft_self_review, reflection]
+      kinds: [topic_plan, outline, report_draft, draft_self_review, reflection]

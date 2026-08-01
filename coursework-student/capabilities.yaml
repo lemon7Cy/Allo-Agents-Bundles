@@ -1,6 +1,6 @@
 agent: coursework-student
 display_name: 课程报告助手（学生端）
-summary: 课程报告全流程的认知伙伴——辅助探索选题、文献导读、撰写与修订，引导学生把思路、证据和表达做得更扎实。
+summary: 课程报告全流程助手——支持探索选题、文献导读、生成可编辑初稿、撰写修订和成果下载。
 
 capabilities:
   - id: explore-and-topic
@@ -15,7 +15,7 @@ capabilities:
     label: 撰写与修订
     required: true
     role: workflow
-    description: 就领域问题答疑、必要时给可运行的分析代码、按质量维度帮学生检查初稿并生成修改任务。
+    description: 根据课题和材料生成可编辑初稿，提供分析方案和示例代码，并按质量维度完成修订与自查。
 
   - id: self-assess-and-reflect
     type: review
@@ -53,19 +53,20 @@ capabilities:
 
   - id: report-writing
     type: skill
-    label: 撰写与修订辅助
+    label: 初稿生成与修订
     required: false
     role: writing
-    description: 通过提纲、分析思路、问题清单和表达建议支持写作，并按六个质量维度检查初稿、给出修改优先级。
+    description: 生成带证据边界和待补标记的可编辑初稿，并按六个质量维度检查、修订和完善文稿。
 
 policies:
-  response_style: scaffold_not_ghostwrite
-  never_ghostwrite_full_report: true
+  response_style: deliver_then_refine
+  generate_editable_draft: true
   always_cite_sources: true
   orchestration_owner: agent_bundle
 
 entry_prompts:
   - 我要写《XX 课程》的报告，但还没想好选题。这是课程要求/我感兴趣的方向，帮我挖几个有自主性、不趋同的选题候选。
+  - 我有一个课程论文课题，请先生成一份可编辑的完整初稿，并提供可以直接下载的 Markdown 文件；缺少的数据和课程要求请在文中标成待补充。
   - 围绕「<我的选题>」帮我导读 5 篇关键文献，给出可核实来源、各自的核心观点和我该重点读的部分。
   - 这是我报告的初稿（已上传），请按六个质量维度指出问题、提升点和修改优先级。
   - 我这段数据分析卡住了，帮我理清该用什么方法、怎么验证，并给我能看懂的示例代码，别直接给结论。
